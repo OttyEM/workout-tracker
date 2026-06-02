@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Workout Tracker</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f2f2f7;
+      color: #1c1c1e;
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 20px 16px 48px;
+    }
+
+    h1 {
+      font-size: 1.7rem;
+      font-weight: 700;
+      margin-bottom: 20px;
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: white;
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+
+    .card h2 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #3a3a3c;
+      margin-bottom: 14px;
+    }
+
+    /* ── Form fields ── */
+    .field { margin-bottom: 12px; }
+
+    label {
+      display: block;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #6c6c70;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 5px;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1.5px solid #d1d1d6;
+      border-radius: 10px;
+      font-size: 1rem;
+      background: #fafafa;
+      -webkit-appearance: none;
+      transition: border-color 0.15s;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #007aff;
+      background: white;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 11px 16px;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      min-height: 44px;
+      transition: opacity 0.12s, transform 0.08s;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    .btn:active { opacity: 0.65; transform: scale(0.97); }
+
+    .btn-primary  { background: #007aff; color: white; width: 100%; }
+    .btn-outline  { background: transparent; color: #007aff; border: 1.5px solid #007aff; width: 100%; margin-top: 8px; }
+    .btn-secondary { background: #e5e5ea; color: #3a3a3c; }
+    .btn-danger   { background: #ff3b30; color: white; }
+    .btn-sm       { padding: 7px 12px; font-size: 0.8rem; min-height: 34px; border-radius: 8px; }
+
+    /* ── Toolbar ── */
+    .toolbar {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 14px;
+    }
+
+    /* ── Entry list ── */
+    .section-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #3a3a3c;
+      margin-bottom: 10px;
+    }
+
+    .entry {
+      background: white;
+      border-radius: 14px;
+      padding: 13px 14px;
+      margin-bottom: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+    }
+
+    .entry-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .entry-name {
+      font-size: 1rem;
+      font-weight: 600;
+      line-height: 1.3;
+    }
+
+    .entry-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+    .entry-meta {
+      font-size: 0.83rem;
+      color: #6c6c70;
+      margin-top: 4px;
+    }
+
+    .empty {
+      text-align: center;
+      color: #8e8e93;
+      font-size: 0.9rem;
+      padding: 32px 0;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Workout Tracker</h1>
+
+<!-- Log / Edit form -->
+<div class="card">
+  <h2 id="form-title">Log Workout</h2>
+
+  <div class="field">
+    <label for="inp-date">Date</label>
+    <input type="date" id="inp-date" required>
+  </div>
+
+  <div class="field">
+    <label for="inp-exercise">Exercise</label>
+    <input type="text" id="inp-exercise" placeholder="e.g. Squat" autocomplete="off" required>
+  </div>
+
+  <div class="row">
+    <div class="field">
+      <label for="inp-sets">Sets</label>
+      <input type="number" id="inp-sets" min="1" placeholder="3">
+    </div>
+    <div class="field">
+      <label for="inp-reps">Reps</label>
+      <input type="number" id="inp-reps" min="1" placeholder="10">
+    </div>
+    <div class="field">
+      <label for="inp-weight">Weight (lbs)</label>
+      <input type="number" id="inp-weight" min="0" step="0.5" placeholder="135">
+    </div>
+  </div>
+
+  <button class="btn btn-primary" id="save-btn" onclick="saveEntry()">Save</button>
+  <button class="btn btn-outline" id="cancel-btn" style="display:none" onclick="cancelEdit()">Cancel</button>
+</div>
+
+<!-- Toolbar -->
+<div class="toolbar">
+  <button class="btn btn-secondary btn-sm" onclick="exportData()">Export JSON</button>
+</div>
+
+<!-- Past entries -->
+<div class="section-title" id="section-title">Past Workouts</div>
+<div id="entries-list"></div>
+
+<script>
+  const KEY = 'workouts_v1';
+  let editingId = null;
+
+  // ── Storage ───────────────────────────────────────────────────────────────
+
+  function loadAll() {
+    try { return JSON.parse(localStorage.getItem(KEY)) || []; }
+    catch { return []; }
+  }
+
+  function saveAll(rows) {
+    localStorage.setItem(KEY, JSON.stringify(rows));
+  }
+
+  function uid() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  function render() {
+    const rows = loadAll();
+    const list = document.getElementById('entries-list');
+    const title = document.getElementById('section-title');
+
+    // Newest date first; within same date, newest id first
+    rows.sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+
+    title.textContent = rows.length ? `Past Workouts (${rows.length})` : 'Past Workouts';
+
+    if (!rows.length) {
+      list.innerHTML = '<div class="empty">No workouts logged yet.</div>';
+      return;
+    }
+
+    list.innerHTML = rows.map(r => {
+      const stats = [
+        r.sets  ? r.sets + ' sets'  : '',
+        r.reps  ? r.reps + ' reps'  : '',
+        r.weight ? r.weight + ' lbs' : '',
+      ].filter(Boolean).join(' · ');
+
+      return `
+        <div class="entry">
+          <div class="entry-top">
+            <span class="entry-name">${esc(r.exercise)}</span>
+            <div class="entry-actions">
+              <button class="btn btn-secondary btn-sm" onclick="startEdit('${r.id}')">Edit</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteEntry('${r.id}')">Del</button>
+            </div>
+          </div>
+          <div class="entry-meta">${fmtDate(r.date)}${stats ? ' &nbsp;·&nbsp; ' + stats : ''}</div>
+        </div>`;
+    }).join('');
+  }
+
+  // ── Save ──────────────────────────────────────────────────────────────────
+
+  function saveEntry() {
+    const date     = document.getElementById('inp-date').value.trim();
+    const exercise = document.getElementById('inp-exercise').value.trim();
+    const sets     = document.getElementById('inp-sets').value.trim();
+    const reps     = document.getElementById('inp-reps').value.trim();
+    const weight   = document.getElementById('inp-weight').value.trim();
+
+    if (!date || !exercise) {
+      alert('Date and exercise name are required.');
+      return;
+    }
+
+    const rows = loadAll();
+
+    if (editingId) {
+      const i = rows.findIndex(r => r.id === editingId);
+      if (i !== -1) rows[i] = { ...rows[i], date, exercise, sets, reps, weight };
+      editingId = null;
+    } else {
+      rows.push({ id: uid(), date, exercise, sets, reps, weight });
+    }
+
+    saveAll(rows);
+    resetForm();
+    render();
+  }
+
+  // ── Edit ──────────────────────────────────────────────────────────────────
+
+  function startEdit(id) {
+    const row = loadAll().find(r => r.id === id);
+    if (!row) return;
+
+    editingId = id;
+    document.getElementById('inp-date').value     = row.date;
+    document.getElementById('inp-exercise').value = row.exercise;
+    document.getElementById('inp-sets').value     = row.sets;
+    document.getElementById('inp-reps').value     = row.reps;
+    document.getElementById('inp-weight').value   = row.weight;
+
+    document.getElementById('form-title').textContent = 'Edit Workout';
+    document.getElementById('save-btn').textContent   = 'Update';
+    document.getElementById('cancel-btn').style.display = '';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function cancelEdit() {
+    editingId = null;
+    resetForm();
+  }
+
+  function resetForm() {
+    document.getElementById('inp-exercise').value = '';
+    document.getElementById('inp-sets').value     = '';
+    document.getElementById('inp-reps').value     = '';
+    document.getElementById('inp-weight').value   = '';
+    // Keep today's date — convenient when logging multiple exercises in a session
+    document.getElementById('form-title').textContent    = 'Log Workout';
+    document.getElementById('save-btn').textContent      = 'Save';
+    document.getElementById('cancel-btn').style.display = 'none';
+  }
+
+  // ── Delete ────────────────────────────────────────────────────────────────
+
+  function deleteEntry(id) {
+    if (!confirm('Delete this entry?')) return;
+    saveAll(loadAll().filter(r => r.id !== id));
+    render();
+  }
+
+  // ── Export ────────────────────────────────────────────────────────────────
+
+  function exportData() {
+    const blob = new Blob(
+      [JSON.stringify(loadAll(), null, 2)],
+      { type: 'application/json' }
+    );
+    const a = Object.assign(document.createElement('a'), {
+      href: URL.createObjectURL(blob),
+      download: `workouts-${today()}.json`,
+    });
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  function esc(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function today() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  function fmtDate(iso) {
+    // Split manually so the date shows in local time, not UTC
+    const [y, m, d] = iso.split('-');
+    return new Date(+y, +m - 1, +d).toLocaleDateString('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric',
+    });
+  }
+
+  // ── Boot ──────────────────────────────────────────────────────────────────
+
+  document.getElementById('inp-date').value = today();
+  render();
+</script>
+</body>
+</html>
