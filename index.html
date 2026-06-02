@@ -194,6 +194,29 @@
     .toggle input:checked + .toggle-track::after { transform: translateX(18px); }
 
     .toggle-label { font-size: 0.9rem; color: #3a3a3c; cursor: pointer; }
+
+    /* ── Superset ── */
+    .superset-divider {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 14px 0 14px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #6c6c70;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .superset-divider::before,
+    .superset-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: #e5e5ea;
+    }
+
+    .superset-plus { color: #007aff; font-weight: 700; }
   </style>
 </head>
 <body>
@@ -210,13 +233,13 @@
   </div>
 
   <div class="field">
-    <label for="inp-exercise">Exercise</label>
+    <label for="inp-exercise" id="lbl-exercise">Exercise</label>
     <input type="text" id="inp-exercise" placeholder="e.g. Squat" autocomplete="off" required>
   </div>
 
   <div class="toggle-row">
     <label class="toggle">
-      <input type="checkbox" id="tempo-toggle" onchange="onTempoToggle()">
+      <input type="checkbox" id="tempo-toggle" onchange="onTempoToggle(1)">
       <span class="toggle-track"></span>
     </label>
     <span class="toggle-label" onclick="document.getElementById('tempo-toggle').click()">Tempo</span>
@@ -239,6 +262,51 @@
     <div class="field">
       <label for="inp-weight">Weight (lbs)</label>
       <input type="number" id="inp-weight" min="0" step="0.5" placeholder="135">
+    </div>
+  </div>
+
+  <div class="toggle-row" style="margin-top:4px">
+    <label class="toggle">
+      <input type="checkbox" id="superset-toggle" onchange="onSupersetToggle()">
+      <span class="toggle-track"></span>
+    </label>
+    <span class="toggle-label" onclick="document.getElementById('superset-toggle').click()">Superset</span>
+  </div>
+
+  <div id="superset-section" style="display:none">
+    <div class="superset-divider">Exercise B</div>
+
+    <div class="field">
+      <label for="inp-exercise2">Exercise</label>
+      <input type="text" id="inp-exercise2" placeholder="e.g. Pull-up" autocomplete="off">
+    </div>
+
+    <div class="toggle-row">
+      <label class="toggle">
+        <input type="checkbox" id="tempo-toggle-2" onchange="onTempoToggle(2)">
+        <span class="toggle-track"></span>
+      </label>
+      <span class="toggle-label" onclick="document.getElementById('tempo-toggle-2').click()">Tempo</span>
+    </div>
+
+    <div class="field" id="tempo-field-2" style="display:none">
+      <label for="inp-tempo-2">Tempo (eccentric · pause · concentric · pause)</label>
+      <input type="text" id="inp-tempo-2" placeholder="3.0.0.1" pattern="\d+\.\d+\.\d+\.\d+">
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label for="inp-sets2">Sets</label>
+        <input type="number" id="inp-sets2" min="1" placeholder="3">
+      </div>
+      <div class="field">
+        <label for="inp-reps2">Reps</label>
+        <input type="number" id="inp-reps2" min="1" placeholder="10">
+      </div>
+      <div class="field">
+        <label for="inp-weight2">Weight (lbs)</label>
+        <input type="number" id="inp-weight2" min="0" step="0.5" placeholder="135">
+      </div>
     </div>
   </div>
 
@@ -292,63 +360,117 @@
     }
 
     list.innerHTML = rows.map(r => {
-      const stats = [
-        r.sets   ? r.sets + ' sets'    : '',
-        r.reps   ? r.reps + ' reps'    : '',
-        r.weight ? r.weight + ' lbs'   : '',
-        r.tempo  ? r.tempo + ' tempo'  : '',
+      const statsFor = (ex, s, rp, w, t) => [
+        s  ? s  + ' sets'  : '',
+        rp ? rp + ' reps'  : '',
+        w  ? w  + ' lbs'   : '',
+        t  ? t  + ' tempo' : '',
       ].filter(Boolean).join(' · ');
+
+      const nameHTML = r.superset && r.exercise2
+        ? `${esc(r.exercise)} <span class="superset-plus">+</span> ${esc(r.exercise2)}`
+        : esc(r.exercise);
+
+      let metaHTML;
+      if (r.superset && r.exercise2) {
+        const sA = statsFor(r.exercise,  r.sets,  r.reps,  r.weight,  r.tempo);
+        const sB = statsFor(r.exercise2, r.sets2, r.reps2, r.weight2, r.tempo2);
+        metaHTML = `
+          <div class="entry-meta">${fmtDate(r.date)}</div>
+          <div class="entry-meta">${esc(r.exercise)}: ${sA || '—'}</div>
+          <div class="entry-meta">${esc(r.exercise2)}: ${sB || '—'}</div>`;
+      } else {
+        const stats = statsFor(r.exercise, r.sets, r.reps, r.weight, r.tempo);
+        metaHTML = `<div class="entry-meta">${fmtDate(r.date)}${stats ? ' &nbsp;·&nbsp; ' + stats : ''}</div>`;
+      }
 
       return `
         <div class="entry">
           <div class="entry-top">
-            <span class="entry-name">${esc(r.exercise)}</span>
+            <span class="entry-name">${nameHTML}</span>
             <div class="entry-actions">
               <button class="btn btn-secondary btn-sm" onclick="startEdit('${r.id}')">Edit</button>
               <button class="btn btn-danger btn-sm" onclick="deleteEntry('${r.id}')">Del</button>
             </div>
           </div>
-          <div class="entry-meta">${fmtDate(r.date)}${stats ? ' &nbsp;·&nbsp; ' + stats : ''}</div>
+          ${metaHTML}
         </div>`;
     }).join('');
   }
 
   // ── Tempo toggle ──────────────────────────────────────────────────────────
 
-  function onTempoToggle() {
-    const on = document.getElementById('tempo-toggle').checked;
-    document.getElementById('tempo-field').style.display = on ? '' : 'none';
-    if (!on) document.getElementById('inp-tempo').value = '';
+  function onTempoToggle(num) {
+    const sfx = num === 2 ? '-2' : '';
+    const on = document.getElementById(`tempo-toggle${sfx}`).checked;
+    document.getElementById(`tempo-field${sfx}`).style.display = on ? '' : 'none';
+    if (!on) document.getElementById(`inp-tempo${sfx}`).value = '';
+  }
+
+  // ── Superset toggle ───────────────────────────────────────────────────────
+
+  function onSupersetToggle() {
+    const on = document.getElementById('superset-toggle').checked;
+    document.getElementById('superset-section').style.display = on ? '' : 'none';
+    document.getElementById('lbl-exercise').textContent = on ? 'Exercise A' : 'Exercise';
+    if (!on) clearExercise2();
+  }
+
+  function clearExercise2() {
+    document.getElementById('inp-exercise2').value          = '';
+    document.getElementById('inp-sets2').value              = '';
+    document.getElementById('inp-reps2').value              = '';
+    document.getElementById('inp-weight2').value            = '';
+    document.getElementById('tempo-toggle-2').checked       = false;
+    document.getElementById('tempo-field-2').style.display = 'none';
+    document.getElementById('inp-tempo-2').value            = '';
   }
 
   // ── Save ──────────────────────────────────────────────────────────────────
 
   function saveEntry() {
-    const date     = document.getElementById('inp-date').value.trim();
-    const exercise = document.getElementById('inp-exercise').value.trim();
-    const sets     = document.getElementById('inp-sets').value.trim();
-    const reps     = document.getElementById('inp-reps').value.trim();
-    const weight   = document.getElementById('inp-weight').value.trim();
-    const tempo    = document.getElementById('inp-tempo').value.trim();
+    const date      = document.getElementById('inp-date').value.trim();
+    const exercise  = document.getElementById('inp-exercise').value.trim();
+    const sets      = document.getElementById('inp-sets').value.trim();
+    const reps      = document.getElementById('inp-reps').value.trim();
+    const weight    = document.getElementById('inp-weight').value.trim();
+    const tempo     = document.getElementById('inp-tempo').value.trim();
+    const superset  = document.getElementById('superset-toggle').checked;
+    const exercise2 = superset ? document.getElementById('inp-exercise2').value.trim() : '';
+    const sets2     = superset ? document.getElementById('inp-sets2').value.trim()     : '';
+    const reps2     = superset ? document.getElementById('inp-reps2').value.trim()     : '';
+    const weight2   = superset ? document.getElementById('inp-weight2').value.trim()   : '';
+    const tempo2    = superset ? document.getElementById('inp-tempo-2').value.trim()   : '';
 
     if (!date || !exercise) {
       alert('Date and exercise name are required.');
       return;
     }
 
+    if (superset && !exercise2) {
+      alert('Please enter a name for Exercise B.');
+      return;
+    }
+
     if (tempo && !/^\d+\.\d+\.\d+\.\d+$/.test(tempo)) {
-      alert('Tempo must be in #.#.#.# format, e.g. 3.0.0.1');
+      alert('Tempo A must be in #.#.#.# format, e.g. 3.0.0.1');
+      return;
+    }
+
+    if (tempo2 && !/^\d+\.\d+\.\d+\.\d+$/.test(tempo2)) {
+      alert('Tempo B must be in #.#.#.# format, e.g. 3.0.0.1');
       return;
     }
 
     const rows = loadAll();
+    const entry = { date, exercise, sets, reps, weight, tempo, superset, exercise2, sets2, reps2, weight2, tempo2 };
 
     if (editingId) {
       const i = rows.findIndex(r => r.id === editingId);
-      if (i !== -1) rows[i] = { ...rows[i], date, exercise, sets, reps, weight, tempo };
+      if (i !== -1) rows[i] = { ...rows[i], ...entry };
       editingId = null;
     } else {
-      rows.push({ id: uid(), date, exercise, sets, reps, weight, tempo });
+      rows.push({ id: uid(), ...entry });
     }
 
     saveAll(rows);
@@ -374,6 +496,21 @@
     document.getElementById('tempo-field').style.display = hasTempo ? '' : 'none';
     document.getElementById('inp-tempo').value            = row.tempo || '';
 
+    const isSuperset = !!row.superset;
+    document.getElementById('superset-toggle').checked          = isSuperset;
+    document.getElementById('superset-section').style.display  = isSuperset ? '' : 'none';
+    document.getElementById('lbl-exercise').textContent         = isSuperset ? 'Exercise A' : 'Exercise';
+    if (isSuperset) {
+      document.getElementById('inp-exercise2').value = row.exercise2 || '';
+      document.getElementById('inp-sets2').value     = row.sets2     || '';
+      document.getElementById('inp-reps2').value     = row.reps2     || '';
+      document.getElementById('inp-weight2').value   = row.weight2   || '';
+      const hasTempo2 = !!row.tempo2;
+      document.getElementById('tempo-toggle-2').checked       = hasTempo2;
+      document.getElementById('tempo-field-2').style.display = hasTempo2 ? '' : 'none';
+      document.getElementById('inp-tempo-2').value            = row.tempo2 || '';
+    }
+
     document.getElementById('form-title').textContent = 'Edit Workout';
     document.getElementById('save-btn').textContent   = 'Update';
     document.getElementById('cancel-btn').style.display = '';
@@ -393,6 +530,10 @@
     document.getElementById('tempo-toggle').checked       = false;
     document.getElementById('tempo-field').style.display = 'none';
     document.getElementById('inp-tempo').value            = '';
+    document.getElementById('superset-toggle').checked          = false;
+    document.getElementById('superset-section').style.display  = 'none';
+    document.getElementById('lbl-exercise').textContent         = 'Exercise';
+    clearExercise2();
     // Keep today's date — convenient when logging multiple exercises in a session
     document.getElementById('form-title').textContent    = 'Log Workout';
     document.getElementById('save-btn').textContent      = 'Save';
