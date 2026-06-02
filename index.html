@@ -149,6 +149,51 @@
       font-size: 0.9rem;
       padding: 32px 0;
     }
+
+    /* ── Tempo toggle ── */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .toggle {
+      position: relative;
+      width: 44px;
+      height: 26px;
+      flex-shrink: 0;
+    }
+
+    .toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      background: #d1d1d6;
+      border-radius: 13px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .toggle input:checked + .toggle-track { background: #007aff; }
+
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 20px;
+      height: 20px;
+      background: white;
+      border-radius: 50%;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+      transition: transform 0.2s;
+    }
+
+    .toggle input:checked + .toggle-track::after { transform: translateX(18px); }
+
+    .toggle-label { font-size: 0.9rem; color: #3a3a3c; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -167,6 +212,19 @@
   <div class="field">
     <label for="inp-exercise">Exercise</label>
     <input type="text" id="inp-exercise" placeholder="e.g. Squat" autocomplete="off" required>
+  </div>
+
+  <div class="toggle-row">
+    <label class="toggle">
+      <input type="checkbox" id="tempo-toggle" onchange="onTempoToggle()">
+      <span class="toggle-track"></span>
+    </label>
+    <span class="toggle-label" onclick="document.getElementById('tempo-toggle').click()">Tempo</span>
+  </div>
+
+  <div class="field" id="tempo-field" style="display:none">
+    <label for="inp-tempo">Tempo (eccentric · pause · concentric · pause)</label>
+    <input type="text" id="inp-tempo" placeholder="3.0.0.1" pattern="\d+\.\d+\.\d+\.\d+">
   </div>
 
   <div class="row">
@@ -235,9 +293,10 @@
 
     list.innerHTML = rows.map(r => {
       const stats = [
-        r.sets  ? r.sets + ' sets'  : '',
-        r.reps  ? r.reps + ' reps'  : '',
-        r.weight ? r.weight + ' lbs' : '',
+        r.sets   ? r.sets + ' sets'    : '',
+        r.reps   ? r.reps + ' reps'    : '',
+        r.weight ? r.weight + ' lbs'   : '',
+        r.tempo  ? r.tempo + ' tempo'  : '',
       ].filter(Boolean).join(' · ');
 
       return `
@@ -254,6 +313,14 @@
     }).join('');
   }
 
+  // ── Tempo toggle ──────────────────────────────────────────────────────────
+
+  function onTempoToggle() {
+    const on = document.getElementById('tempo-toggle').checked;
+    document.getElementById('tempo-field').style.display = on ? '' : 'none';
+    if (!on) document.getElementById('inp-tempo').value = '';
+  }
+
   // ── Save ──────────────────────────────────────────────────────────────────
 
   function saveEntry() {
@@ -262,9 +329,15 @@
     const sets     = document.getElementById('inp-sets').value.trim();
     const reps     = document.getElementById('inp-reps').value.trim();
     const weight   = document.getElementById('inp-weight').value.trim();
+    const tempo    = document.getElementById('inp-tempo').value.trim();
 
     if (!date || !exercise) {
       alert('Date and exercise name are required.');
+      return;
+    }
+
+    if (tempo && !/^\d+\.\d+\.\d+\.\d+$/.test(tempo)) {
+      alert('Tempo must be in #.#.#.# format, e.g. 3.0.0.1');
       return;
     }
 
@@ -272,10 +345,10 @@
 
     if (editingId) {
       const i = rows.findIndex(r => r.id === editingId);
-      if (i !== -1) rows[i] = { ...rows[i], date, exercise, sets, reps, weight };
+      if (i !== -1) rows[i] = { ...rows[i], date, exercise, sets, reps, weight, tempo };
       editingId = null;
     } else {
-      rows.push({ id: uid(), date, exercise, sets, reps, weight });
+      rows.push({ id: uid(), date, exercise, sets, reps, weight, tempo });
     }
 
     saveAll(rows);
@@ -296,6 +369,11 @@
     document.getElementById('inp-reps').value     = row.reps;
     document.getElementById('inp-weight').value   = row.weight;
 
+    const hasTempo = !!row.tempo;
+    document.getElementById('tempo-toggle').checked      = hasTempo;
+    document.getElementById('tempo-field').style.display = hasTempo ? '' : 'none';
+    document.getElementById('inp-tempo').value            = row.tempo || '';
+
     document.getElementById('form-title').textContent = 'Edit Workout';
     document.getElementById('save-btn').textContent   = 'Update';
     document.getElementById('cancel-btn').style.display = '';
@@ -308,10 +386,13 @@
   }
 
   function resetForm() {
-    document.getElementById('inp-exercise').value = '';
-    document.getElementById('inp-sets').value     = '';
-    document.getElementById('inp-reps').value     = '';
-    document.getElementById('inp-weight').value   = '';
+    document.getElementById('inp-exercise').value        = '';
+    document.getElementById('inp-sets').value             = '';
+    document.getElementById('inp-reps').value             = '';
+    document.getElementById('inp-weight').value           = '';
+    document.getElementById('tempo-toggle').checked       = false;
+    document.getElementById('tempo-field').style.display = 'none';
+    document.getElementById('inp-tempo').value            = '';
     // Keep today's date — convenient when logging multiple exercises in a session
     document.getElementById('form-title').textContent    = 'Log Workout';
     document.getElementById('save-btn').textContent      = 'Save';
