@@ -141,6 +141,8 @@
       font-size: 0.83rem;
       color: #6c6c70;
       margin-top: 4px;
+      overflow-wrap: break-word;
+      word-break: break-word;
     }
 
     .empty {
@@ -265,6 +267,15 @@
     }
 
     .superset-plus { color: #007aff; font-weight: 700; }
+
+    .entry-comment {
+      font-size: 0.82rem;
+      color: #8e8e93;
+      font-style: italic;
+      margin-top: 3px;
+      overflow-wrap: break-word;
+      word-break: break-word;
+    }
   </style>
 </head>
 <body>
@@ -313,6 +324,11 @@
     </div>
   </div>
 
+  <div class="field">
+    <label for="inp-comment">Comments</label>
+    <input type="text" id="inp-comment" placeholder="Optional notes…" autocomplete="off">
+  </div>
+
   <div class="toggle-row" style="margin-top:4px">
     <label class="toggle">
       <input type="checkbox" id="superset-toggle" onchange="onSupersetToggle()">
@@ -355,6 +371,11 @@
         <label for="inp-weight2">Weight (lbs)</label>
         <input type="number" id="inp-weight2" min="0" step="0.5" placeholder="135">
       </div>
+    </div>
+
+    <div class="field">
+      <label for="inp-comment2">Comments</label>
+      <input type="text" id="inp-comment2" placeholder="Optional notes…" autocomplete="off">
     </div>
   </div>
 
@@ -444,10 +465,13 @@
           const sB = statsLine(r.sets2, r.reps2, r.weight2, r.tempo2);
           statsHTML = `
             <div class="entry-meta">${esc(r.exercise)}: ${sA || '—'}</div>
-            <div class="entry-meta">${esc(r.exercise2)}: ${sB || '—'}</div>`;
+            ${r.comment  ? `<div class="entry-comment">${esc(r.comment)}</div>`  : ''}
+            <div class="entry-meta">${esc(r.exercise2)}: ${sB || '—'}</div>
+            ${r.comment2 ? `<div class="entry-comment">${esc(r.comment2)}</div>` : ''}`;
         } else {
           const s = statsLine(r.sets, r.reps, r.weight, r.tempo);
-          statsHTML = s ? `<div class="entry-meta">${s}</div>` : '';
+          statsHTML = (s ? `<div class="entry-meta">${s}</div>` : '')
+            + (r.comment ? `<div class="entry-comment">${esc(r.comment)}</div>` : '');
         }
 
         return `
@@ -505,6 +529,7 @@
     document.getElementById('inp-sets2').value              = '';
     document.getElementById('inp-reps2').value              = '';
     document.getElementById('inp-weight2').value            = '';
+    document.getElementById('inp-comment2').value           = '';
     document.getElementById('tempo-toggle-2').checked       = false;
     document.getElementById('tempo-field-2').style.display = 'none';
     document.getElementById('inp-tempo-2').value            = '';
@@ -519,12 +544,14 @@
     const reps      = document.getElementById('inp-reps').value.trim();
     const weight    = document.getElementById('inp-weight').value.trim();
     const tempo     = document.getElementById('inp-tempo').value.trim();
+    const comment   = document.getElementById('inp-comment').value.trim();
     const superset  = document.getElementById('superset-toggle').checked;
-    const exercise2 = superset ? document.getElementById('inp-exercise2').value.trim() : '';
-    const sets2     = superset ? document.getElementById('inp-sets2').value.trim()     : '';
-    const reps2     = superset ? document.getElementById('inp-reps2').value.trim()     : '';
-    const weight2   = superset ? document.getElementById('inp-weight2').value.trim()   : '';
-    const tempo2    = superset ? document.getElementById('inp-tempo-2').value.trim()   : '';
+    const exercise2 = superset ? document.getElementById('inp-exercise2').value.trim()  : '';
+    const sets2     = superset ? document.getElementById('inp-sets2').value.trim()      : '';
+    const reps2     = superset ? document.getElementById('inp-reps2').value.trim()      : '';
+    const weight2   = superset ? document.getElementById('inp-weight2').value.trim()    : '';
+    const tempo2    = superset ? document.getElementById('inp-tempo-2').value.trim()    : '';
+    const comment2  = superset ? document.getElementById('inp-comment2').value.trim()   : '';
 
     if (!date || !exercise) {
       alert('Date and exercise name are required.');
@@ -547,7 +574,7 @@
     }
 
     const rows = loadAll();
-    const entry = { date, exercise, sets, reps, weight, tempo, superset, exercise2, sets2, reps2, weight2, tempo2 };
+    const entry = { date, exercise, sets, reps, weight, tempo, comment, superset, exercise2, sets2, reps2, weight2, tempo2, comment2 };
 
     if (editingId) {
       const i = rows.findIndex(r => r.id === editingId);
@@ -578,7 +605,8 @@
     const hasTempo = !!row.tempo;
     document.getElementById('tempo-toggle').checked      = hasTempo;
     document.getElementById('tempo-field').style.display = hasTempo ? '' : 'none';
-    document.getElementById('inp-tempo').value            = row.tempo || '';
+    document.getElementById('inp-tempo').value            = row.tempo   || '';
+    document.getElementById('inp-comment').value          = row.comment || '';
 
     const isSuperset = !!row.superset;
     document.getElementById('superset-toggle').checked          = isSuperset;
@@ -589,6 +617,7 @@
       document.getElementById('inp-sets2').value     = row.sets2     || '';
       document.getElementById('inp-reps2').value     = row.reps2     || '';
       document.getElementById('inp-weight2').value   = row.weight2   || '';
+      document.getElementById('inp-comment2').value  = row.comment2  || '';
       const hasTempo2 = !!row.tempo2;
       document.getElementById('tempo-toggle-2').checked       = hasTempo2;
       document.getElementById('tempo-field-2').style.display = hasTempo2 ? '' : 'none';
@@ -614,6 +643,7 @@
     document.getElementById('tempo-toggle').checked       = false;
     document.getElementById('tempo-field').style.display = 'none';
     document.getElementById('inp-tempo').value            = '';
+    document.getElementById('inp-comment').value          = '';
     document.getElementById('superset-toggle').checked          = false;
     document.getElementById('superset-section').style.display  = 'none';
     document.getElementById('lbl-exercise').textContent         = 'Exercise';
