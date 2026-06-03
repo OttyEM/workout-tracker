@@ -440,7 +440,7 @@
     const dates = Object.keys(groups).sort((a, b) => b.localeCompare(a));
     dates.forEach(d => groups[d].sort((a, b) => b.id.localeCompare(a.id)));
 
-    title.textContent = `Past Workouts (${rows.length})`;
+    title.textContent = `Past Workouts (${dates.length})`;
 
     list.innerHTML = dates.map(date => {
       const entries = groups[date];
