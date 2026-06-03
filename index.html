@@ -277,32 +277,30 @@
       word-break: break-word;
     }
 
-    /* ── Tabs ── */
-    .tabs {
-      display: flex;
-      background: white;
-      border-radius: 12px;
-      padding: 4px;
-      margin-bottom: 20px;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-    }
-
-    .tab {
-      flex: 1;
-      padding: 8px;
+    /* ── FAB ── */
+    .fab {
+      position: fixed;
+      bottom: 28px;
+      right: 24px;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: #007aff;
+      color: white;
+      font-size: 1.8rem;
+      line-height: 1;
       border: none;
-      background: transparent;
-      border-radius: 9px;
-      font-size: 0.9rem;
-      font-weight: 600;
-      color: #6c6c70;
+      box-shadow: 0 4px 16px rgba(0,122,255,0.4);
       cursor: pointer;
-      transition: background 0.15s, color 0.15s;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       -webkit-tap-highlight-color: transparent;
-      min-height: 36px;
+      transition: transform 0.1s, box-shadow 0.1s;
     }
 
-    .tab.active { background: #f2f2f7; color: #1c1c1e; }
+    .fab:active { transform: scale(0.93); box-shadow: 0 2px 8px rgba(0,122,255,0.3); }
 
     /* ── Calendar ── */
     .cal-nav {
@@ -379,12 +377,7 @@
 
 <h1>Workout Tracker</h1>
 
-<div class="tabs">
-  <button class="tab active" data-view="log" onclick="showView('log')">Log</button>
-  <button class="tab" data-view="calendar" onclick="showView('calendar')">Calendar</button>
-</div>
-
-<div id="view-log">
+<div id="view-form" style="display:none">
 
 <!-- Log / Edit form -->
 <div class="card">
@@ -487,23 +480,15 @@
   <button class="btn btn-outline" id="cancel-btn" style="display:none" onclick="cancelEdit()">Cancel</button>
 </div>
 
-<!-- Toolbar -->
-<div class="toolbar">
-  <button class="btn btn-secondary btn-sm" onclick="exportData()">Export JSON</button>
-</div>
+</div><!-- end view-form -->
 
-<!-- Past entries -->
-<div class="section-title" id="section-title">Past Workouts</div>
-<div id="entries-list"></div>
-
-</div><!-- end view-log -->
-
-<div id="view-calendar" style="display:none">
+<div id="view-calendar">
   <div class="card">
     <div class="cal-nav">
       <button class="btn btn-secondary btn-sm" onclick="changeMonth(-1)">‹</button>
       <span id="cal-month-label" class="cal-month-label"></span>
       <button class="btn btn-secondary btn-sm" onclick="changeMonth(1)">›</button>
+      <button class="btn btn-secondary btn-sm" onclick="exportData()">Export</button>
     </div>
     <div class="cal-weekdays">
       <div class="cal-weekday">Su</div>
@@ -634,13 +619,23 @@
 
   // ── Calendar ──────────────────────────────────────────────────────────────
 
-  function showView(view) {
-    document.getElementById('view-log').style.display      = view === 'log'      ? '' : 'none';
-    document.getElementById('view-calendar').style.display = view === 'calendar' ? '' : 'none';
-    document.querySelectorAll('.tab').forEach(t =>
-      t.classList.toggle('active', t.dataset.view === view)
-    );
-    if (view === 'calendar') renderCalendar();
+  function startNewEntry() {
+    document.getElementById('inp-date').value = selectedCalDate || today();
+    openForm();
+  }
+
+  function openForm() {
+    document.getElementById('view-form').style.display     = '';
+    document.getElementById('view-calendar').style.display = 'none';
+    document.getElementById('cancel-btn').style.display    = '';
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }
+
+  function closeForm() {
+    resetForm();
+    document.getElementById('view-form').style.display     = 'none';
+    document.getElementById('view-calendar').style.display = '';
+    renderCalendar();
   }
 
   function changeMonth(delta) {
@@ -776,9 +771,7 @@
     }
 
     saveAll(rows);
-    resetForm();
-    render();
-    renderCalDayDetail();
+    closeForm();
   }
 
   // ── Edit ──────────────────────────────────────────────────────────────────
@@ -819,13 +812,12 @@
     document.getElementById('form-title').textContent = 'Edit Workout';
     document.getElementById('save-btn').textContent   = 'Update';
     document.getElementById('cancel-btn').style.display = '';
-    showView('log');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    openForm();
   }
 
   function cancelEdit() {
     editingId = null;
-    resetForm();
+    closeForm();
   }
 
   function resetForm() {
@@ -852,8 +844,7 @@
   function deleteEntry(id) {
     if (!confirm('Delete this entry?')) return;
     saveAll(loadAll().filter(r => r.id !== id));
-    render();
-    renderCalDayDetail();
+    renderCalendar();
   }
 
   // ── Export ────────────────────────────────────────────────────────────────
@@ -891,8 +882,8 @@
 
   // ── Boot ──────────────────────────────────────────────────────────────────
 
-  document.getElementById('inp-date').value = today();
-  render();
+  renderCalendar();
 </script>
+<button class="fab" onclick="startNewEntry()" aria-label="Log workout">+</button>
 </body>
 </html>
