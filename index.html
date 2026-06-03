@@ -276,11 +276,115 @@
       overflow-wrap: break-word;
       word-break: break-word;
     }
+
+    /* ── Tabs ── */
+    .tabs {
+      display: flex;
+      background: white;
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+
+    .tab {
+      flex: 1;
+      padding: 8px;
+      border: none;
+      background: transparent;
+      border-radius: 9px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #6c6c70;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      -webkit-tap-highlight-color: transparent;
+      min-height: 36px;
+    }
+
+    .tab.active { background: #f2f2f7; color: #1c1c1e; }
+
+    /* ── Calendar ── */
+    .cal-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .cal-month-label { font-size: 1rem; font-weight: 600; }
+
+    .cal-weekdays {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      margin-bottom: 4px;
+    }
+
+    .cal-weekday {
+      text-align: center;
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: #8e8e93;
+      text-transform: uppercase;
+      padding: 4px 0;
+    }
+
+    .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 3px;
+    }
+
+    .cal-cell {
+      aspect-ratio: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    .cal-cell:empty { cursor: default; }
+    .cal-cell:not(:empty):active { opacity: 0.6; }
+
+    .cal-day-num { font-size: 0.88rem; font-weight: 500; line-height: 1; }
+
+    .cal-cell.is-today .cal-day-num { color: #007aff; font-weight: 700; }
+
+    .cal-cell.selected { background: #007aff; }
+    .cal-cell.selected .cal-day-num { color: white; }
+
+    .cal-dot {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: #007aff;
+      margin-top: 3px;
+    }
+
+    .cal-cell.selected .cal-dot { background: white; }
+
+    .cal-detail-header {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #3a3a3c;
+      margin: 16px 0 8px;
+    }
   </style>
 </head>
 <body>
 
 <h1>Workout Tracker</h1>
+
+<div class="tabs">
+  <button class="tab active" data-view="log" onclick="showView('log')">Log</button>
+  <button class="tab" data-view="calendar" onclick="showView('calendar')">Calendar</button>
+</div>
+
+<div id="view-log">
 
 <!-- Log / Edit form -->
 <div class="card">
@@ -392,10 +496,36 @@
 <div class="section-title" id="section-title">Past Workouts</div>
 <div id="entries-list"></div>
 
+</div><!-- end view-log -->
+
+<div id="view-calendar" style="display:none">
+  <div class="card">
+    <div class="cal-nav">
+      <button class="btn btn-secondary btn-sm" onclick="changeMonth(-1)">‹</button>
+      <span id="cal-month-label" class="cal-month-label"></span>
+      <button class="btn btn-secondary btn-sm" onclick="changeMonth(1)">›</button>
+    </div>
+    <div class="cal-weekdays">
+      <div class="cal-weekday">Su</div>
+      <div class="cal-weekday">Mo</div>
+      <div class="cal-weekday">Tu</div>
+      <div class="cal-weekday">We</div>
+      <div class="cal-weekday">Th</div>
+      <div class="cal-weekday">Fr</div>
+      <div class="cal-weekday">Sa</div>
+    </div>
+    <div class="cal-grid" id="cal-grid"></div>
+  </div>
+  <div id="cal-day-detail"></div>
+</div>
+
 <script>
   const KEY = 'workouts_v1';
   let editingId = null;
   let openDates = new Set();
+  let calYear  = new Date().getFullYear();
+  let calMonth = new Date().getMonth();
+  let selectedCalDate = null;
 
   // ── Storage ───────────────────────────────────────────────────────────────
 
@@ -423,6 +553,39 @@
     ].filter(Boolean).join(' · ');
   }
 
+  function entryHTML(r) {
+    const nameHTML = r.superset && r.exercise2
+      ? `${esc(r.exercise)} <span class="superset-plus">+</span> ${esc(r.exercise2)}`
+      : esc(r.exercise);
+
+    let statsHTML;
+    if (r.superset && r.exercise2) {
+      const sA = statsLine(r.sets,  r.reps,  r.weight,  r.tempo);
+      const sB = statsLine(r.sets2, r.reps2, r.weight2, r.tempo2);
+      statsHTML = `
+        <div class="entry-meta">${esc(r.exercise)}: ${sA || '—'}</div>
+        ${r.comment  ? `<div class="entry-comment">${esc(r.comment)}</div>`  : ''}
+        <div class="entry-meta">${esc(r.exercise2)}: ${sB || '—'}</div>
+        ${r.comment2 ? `<div class="entry-comment">${esc(r.comment2)}</div>` : ''}`;
+    } else {
+      const s = statsLine(r.sets, r.reps, r.weight, r.tempo);
+      statsHTML = (s ? `<div class="entry-meta">${s}</div>` : '')
+        + (r.comment ? `<div class="entry-comment">${esc(r.comment)}</div>` : '');
+    }
+
+    return `
+      <div class="day-entry">
+        <div class="entry-top">
+          <span class="entry-name">${nameHTML}</span>
+          <div class="entry-actions">
+            <button class="btn btn-secondary btn-sm" onclick="startEdit('${r.id}')">Edit</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteEntry('${r.id}')">Del</button>
+          </div>
+        </div>
+        ${statsHTML}
+      </div>`;
+  }
+
   function render() {
     const rows = loadAll();
     const list  = document.getElementById('entries-list');
@@ -434,7 +597,6 @@
       return;
     }
 
-    // Group by date
     const groups = {};
     rows.forEach(r => { (groups[r.date] = groups[r.date] || []).push(r); });
     const dates = Object.keys(groups).sort((a, b) => b.localeCompare(a));
@@ -445,47 +607,11 @@
     list.innerHTML = dates.map(date => {
       const entries = groups[date];
       const isOpen  = openDates.has(date);
-
-      // Collapsed summary: just the exercise names
       const summary = entries.map(r =>
         r.superset && r.exercise2
           ? `${esc(r.exercise)} + ${esc(r.exercise2)}`
           : esc(r.exercise)
       ).join(' · ');
-
-      // Expanded entries
-      const entriesHTML = entries.map(r => {
-        const nameHTML = r.superset && r.exercise2
-          ? `${esc(r.exercise)} <span class="superset-plus">+</span> ${esc(r.exercise2)}`
-          : esc(r.exercise);
-
-        let statsHTML;
-        if (r.superset && r.exercise2) {
-          const sA = statsLine(r.sets,  r.reps,  r.weight,  r.tempo);
-          const sB = statsLine(r.sets2, r.reps2, r.weight2, r.tempo2);
-          statsHTML = `
-            <div class="entry-meta">${esc(r.exercise)}: ${sA || '—'}</div>
-            ${r.comment  ? `<div class="entry-comment">${esc(r.comment)}</div>`  : ''}
-            <div class="entry-meta">${esc(r.exercise2)}: ${sB || '—'}</div>
-            ${r.comment2 ? `<div class="entry-comment">${esc(r.comment2)}</div>` : ''}`;
-        } else {
-          const s = statsLine(r.sets, r.reps, r.weight, r.tempo);
-          statsHTML = (s ? `<div class="entry-meta">${s}</div>` : '')
-            + (r.comment ? `<div class="entry-comment">${esc(r.comment)}</div>` : '');
-        }
-
-        return `
-          <div class="day-entry">
-            <div class="entry-top">
-              <span class="entry-name">${nameHTML}</span>
-              <div class="entry-actions">
-                <button class="btn btn-secondary btn-sm" onclick="startEdit('${r.id}')">Edit</button>
-                <button class="btn btn-danger btn-sm" onclick="deleteEntry('${r.id}')">Del</button>
-              </div>
-            </div>
-            ${statsHTML}
-          </div>`;
-      }).join('');
 
       return `
         <div class="day-group">
@@ -496,7 +622,7 @@
             </div>
             <span class="chevron ${isOpen ? 'open' : ''}">›</span>
           </div>
-          ${isOpen ? `<div class="day-entries">${entriesHTML}</div>` : ''}
+          ${isOpen ? `<div class="day-entries">${entries.map(entryHTML).join('')}</div>` : ''}
         </div>`;
     }).join('');
   }
@@ -504,6 +630,71 @@
   function toggleDay(date) {
     openDates.has(date) ? openDates.delete(date) : openDates.add(date);
     render();
+  }
+
+  // ── Calendar ──────────────────────────────────────────────────────────────
+
+  function showView(view) {
+    document.getElementById('view-log').style.display      = view === 'log'      ? '' : 'none';
+    document.getElementById('view-calendar').style.display = view === 'calendar' ? '' : 'none';
+    document.querySelectorAll('.tab').forEach(t =>
+      t.classList.toggle('active', t.dataset.view === view)
+    );
+    if (view === 'calendar') renderCalendar();
+  }
+
+  function changeMonth(delta) {
+    calMonth += delta;
+    if (calMonth > 11) { calMonth = 0;  calYear++; }
+    if (calMonth < 0)  { calMonth = 11; calYear--; }
+    selectedCalDate = null;
+    renderCalendar();
+  }
+
+  function selectCalDate(dateStr) {
+    selectedCalDate = selectedCalDate === dateStr ? null : dateStr;
+    renderCalendar();
+  }
+
+  function renderCalendar() {
+    const workoutDates = new Set(loadAll().map(r => r.date));
+    const firstDow    = new Date(calYear, calMonth, 1).getDay();
+    const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+    const monthLabel  = new Date(calYear, calMonth, 1)
+      .toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const todayStr = today();
+
+    let cells = '';
+    for (let i = 0; i < firstDow; i++) cells += '<div class="cal-cell"></div>';
+    for (let d = 1; d <= daysInMonth; d++) {
+      const ds = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const cls = ['cal-cell',
+        workoutDates.has(ds)    ? 'has-workout' : '',
+        selectedCalDate === ds  ? 'selected'    : '',
+        ds === todayStr         ? 'is-today'    : '',
+      ].filter(Boolean).join(' ');
+      cells += `
+        <div class="${cls}" onclick="selectCalDate('${ds}')">
+          <span class="cal-day-num">${d}</span>
+          ${workoutDates.has(ds) ? '<span class="cal-dot"></span>' : ''}
+        </div>`;
+    }
+
+    document.getElementById('cal-month-label').textContent = monthLabel;
+    document.getElementById('cal-grid').innerHTML = cells;
+    renderCalDayDetail();
+  }
+
+  function renderCalDayDetail() {
+    const el = document.getElementById('cal-day-detail');
+    if (!selectedCalDate) { el.innerHTML = ''; return; }
+    const rows = loadAll()
+      .filter(r => r.date === selectedCalDate)
+      .sort((a, b) => b.id.localeCompare(a.id));
+    if (!rows.length) { el.innerHTML = ''; return; }
+    el.innerHTML = `
+      <div class="cal-detail-header">${fmtDate(selectedCalDate)}</div>
+      <div class="day-entries">${rows.map(entryHTML).join('')}</div>`;
   }
 
   // ── Tempo toggle ──────────────────────────────────────────────────────────
@@ -587,6 +778,7 @@
     saveAll(rows);
     resetForm();
     render();
+    renderCalDayDetail();
   }
 
   // ── Edit ──────────────────────────────────────────────────────────────────
@@ -627,6 +819,7 @@
     document.getElementById('form-title').textContent = 'Edit Workout';
     document.getElementById('save-btn').textContent   = 'Update';
     document.getElementById('cancel-btn').style.display = '';
+    showView('log');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -660,6 +853,7 @@
     if (!confirm('Delete this entry?')) return;
     saveAll(loadAll().filter(r => r.id !== id));
     render();
+    renderCalDayDetail();
   }
 
   // ── Export ────────────────────────────────────────────────────────────────
