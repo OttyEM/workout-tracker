@@ -150,6 +150,54 @@
       padding: 32px 0;
     }
 
+    /* ── Day groups ── */
+    .day-group { margin-bottom: 10px; }
+
+    .day-header {
+      background: white;
+      border-radius: 14px;
+      padding: 13px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    .day-header.open { border-radius: 14px 14px 0 0; }
+
+    .day-date { font-size: 0.95rem; font-weight: 600; }
+
+    .day-summary {
+      font-size: 0.82rem;
+      color: #6c6c70;
+      margin-top: 3px;
+    }
+
+    .chevron {
+      display: inline-block;
+      font-size: 1.1rem;
+      color: #8e8e93;
+      margin-left: 8px;
+      flex-shrink: 0;
+      transition: transform 0.2s;
+    }
+
+    .chevron.open { transform: rotate(90deg); }
+
+    .day-entries {
+      background: white;
+      border-radius: 0 0 14px 14px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.07);
+    }
+
+    .day-entry {
+      padding: 12px 14px;
+      border-top: 1px solid #f2f2f7;
+    }
+
     /* ── Tempo toggle ── */
     .toggle-row {
       display: flex;
@@ -326,6 +374,7 @@
 <script>
   const KEY = 'workouts_v1';
   let editingId = null;
+  let openDates = new Set();
 
   // ── Storage ───────────────────────────────────────────────────────────────
 
@@ -344,58 +393,93 @@
 
   // ── Render ────────────────────────────────────────────────────────────────
 
+  function statsLine(s, rp, w, t) {
+    return [
+      s  ? s  + ' sets'  : '',
+      rp ? rp + ' reps'  : '',
+      w  ? w  + ' lbs'   : '',
+      t  ? t  + ' tempo' : '',
+    ].filter(Boolean).join(' · ');
+  }
+
   function render() {
     const rows = loadAll();
-    const list = document.getElementById('entries-list');
+    const list  = document.getElementById('entries-list');
     const title = document.getElementById('section-title');
 
-    // Newest date first; within same date, newest id first
-    rows.sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
-
-    title.textContent = rows.length ? `Past Workouts (${rows.length})` : 'Past Workouts';
-
     if (!rows.length) {
+      title.textContent = 'Past Workouts';
       list.innerHTML = '<div class="empty">No workouts logged yet.</div>';
       return;
     }
 
-    list.innerHTML = rows.map(r => {
-      const statsFor = (ex, s, rp, w, t) => [
-        s  ? s  + ' sets'  : '',
-        rp ? rp + ' reps'  : '',
-        w  ? w  + ' lbs'   : '',
-        t  ? t  + ' tempo' : '',
-      ].filter(Boolean).join(' · ');
+    // Group by date
+    const groups = {};
+    rows.forEach(r => { (groups[r.date] = groups[r.date] || []).push(r); });
+    const dates = Object.keys(groups).sort((a, b) => b.localeCompare(a));
+    dates.forEach(d => groups[d].sort((a, b) => b.id.localeCompare(a.id)));
 
-      const nameHTML = r.superset && r.exercise2
-        ? `${esc(r.exercise)} <span class="superset-plus">+</span> ${esc(r.exercise2)}`
-        : esc(r.exercise);
+    title.textContent = `Past Workouts (${rows.length})`;
 
-      let metaHTML;
-      if (r.superset && r.exercise2) {
-        const sA = statsFor(r.exercise,  r.sets,  r.reps,  r.weight,  r.tempo);
-        const sB = statsFor(r.exercise2, r.sets2, r.reps2, r.weight2, r.tempo2);
-        metaHTML = `
-          <div class="entry-meta">${fmtDate(r.date)}</div>
-          <div class="entry-meta">${esc(r.exercise)}: ${sA || '—'}</div>
-          <div class="entry-meta">${esc(r.exercise2)}: ${sB || '—'}</div>`;
-      } else {
-        const stats = statsFor(r.exercise, r.sets, r.reps, r.weight, r.tempo);
-        metaHTML = `<div class="entry-meta">${fmtDate(r.date)}${stats ? ' &nbsp;·&nbsp; ' + stats : ''}</div>`;
-      }
+    list.innerHTML = dates.map(date => {
+      const entries = groups[date];
+      const isOpen  = openDates.has(date);
+
+      // Collapsed summary: just the exercise names
+      const summary = entries.map(r =>
+        r.superset && r.exercise2
+          ? `${esc(r.exercise)} + ${esc(r.exercise2)}`
+          : esc(r.exercise)
+      ).join(' · ');
+
+      // Expanded entries
+      const entriesHTML = entries.map(r => {
+        const nameHTML = r.superset && r.exercise2
+          ? `${esc(r.exercise)} <span class="superset-plus">+</span> ${esc(r.exercise2)}`
+          : esc(r.exercise);
+
+        let statsHTML;
+        if (r.superset && r.exercise2) {
+          const sA = statsLine(r.sets,  r.reps,  r.weight,  r.tempo);
+          const sB = statsLine(r.sets2, r.reps2, r.weight2, r.tempo2);
+          statsHTML = `
+            <div class="entry-meta">${esc(r.exercise)}: ${sA || '—'}</div>
+            <div class="entry-meta">${esc(r.exercise2)}: ${sB || '—'}</div>`;
+        } else {
+          const s = statsLine(r.sets, r.reps, r.weight, r.tempo);
+          statsHTML = s ? `<div class="entry-meta">${s}</div>` : '';
+        }
+
+        return `
+          <div class="day-entry">
+            <div class="entry-top">
+              <span class="entry-name">${nameHTML}</span>
+              <div class="entry-actions">
+                <button class="btn btn-secondary btn-sm" onclick="startEdit('${r.id}')">Edit</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteEntry('${r.id}')">Del</button>
+              </div>
+            </div>
+            ${statsHTML}
+          </div>`;
+      }).join('');
 
       return `
-        <div class="entry">
-          <div class="entry-top">
-            <span class="entry-name">${nameHTML}</span>
-            <div class="entry-actions">
-              <button class="btn btn-secondary btn-sm" onclick="startEdit('${r.id}')">Edit</button>
-              <button class="btn btn-danger btn-sm" onclick="deleteEntry('${r.id}')">Del</button>
+        <div class="day-group">
+          <div class="day-header ${isOpen ? 'open' : ''}" onclick="toggleDay('${date}')">
+            <div>
+              <div class="day-date">${fmtDate(date)}</div>
+              <div class="day-summary">${summary}</div>
             </div>
+            <span class="chevron ${isOpen ? 'open' : ''}">›</span>
           </div>
-          ${metaHTML}
+          ${isOpen ? `<div class="day-entries">${entriesHTML}</div>` : ''}
         </div>`;
     }).join('');
+  }
+
+  function toggleDay(date) {
+    openDates.has(date) ? openDates.delete(date) : openDates.add(date);
+    render();
   }
 
   // ── Tempo toggle ──────────────────────────────────────────────────────────
