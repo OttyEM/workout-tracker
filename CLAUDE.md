@@ -16,11 +16,12 @@ on my iPhone in the browser. Not a product — simplicity beats features.
 Each workout entry is a flat object stored in a JSON array:
 
 ```
-id, date, exercise, sets, reps, weight, tempo, comment,
+id, date, exercise, sets, reps, weight, tempo, comment, unit,
 superset, exercise2, sets2, reps2, weight2, tempo2, comment2
 ```
 
 - `tempo` format: `#.#.#.#` (e.g. `3.0.0.1` = eccentric · pause · concentric · pause)
+- `unit`: `'lbs'` or `'kg'` — chosen per entry via a segmented picker; weight is stored as-is with no conversion. Defaults to `'lbs'` for old entries missing this field.
 - `superset: true` means the entry has a second exercise (exercise2 and its fields)
 - Fields are empty strings `""` when not filled in, never `null`
 
