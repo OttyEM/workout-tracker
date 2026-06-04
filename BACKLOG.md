@@ -3,8 +3,8 @@
 ## Phase 1 — Quick wins (low effort, no architectural change)
 - ~~Autocomplete movement names from movements already in the database when logging.~~
 - ~~Export a single day's data (alongside the existing full export).~~
-- Deploy the app online so I can reach it from my phone on any network
-  (data still stored locally on-device for now).
+- ~~Deploy the app online so I can reach it from my phone on any network
+  (data still stored locally on-device for now).~~
 
 ## Phase 2 — Movement-centric structure
 - Left-hand navigation menu with two sections: "Workout" and "Movement list".
@@ -28,3 +28,4 @@
   edit/delete, JSON export.
 - Autocomplete exercise names from existing history (custom dropdown, iOS Safari compatible).
 - Single-day share as print-to-PDF (opens formatted print page, saves to Files or shares via AirDrop/Mail on iPhone).
+- Deployed on GitHub Pages at https://ottyem.github.io/workout-tracker
