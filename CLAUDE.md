@@ -42,6 +42,10 @@ superset, exercise2, sets2, reps2, weight2, tempo2, comment2
 - Logging a workout should be fast and require as few taps as possible.
 - Don't add features not explicitly requested.
 
+## Deployment
+- Hosted on GitHub Pages at **https://ottyem.github.io/workout-tracker**
+- After committing, run `git push` to publish. GitHub Pages rebuilds in ~60 seconds.
+
 ## How I like to work
 - I'm rusty at coding, so explain changes briefly and avoid unexplained jargon.
 - Make one change at a time so I can check each result.
