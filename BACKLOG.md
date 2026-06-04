@@ -2,7 +2,7 @@
 
 ## Phase 1 — Quick wins (low effort, no architectural change)
 - ~~Autocomplete movement names from movements already in the database when logging.~~
-- Export a single day's data (alongside the existing full export).
+- ~~Export a single day's data (alongside the existing full export).~~
 - Deploy the app online so I can reach it from my phone on any network
   (data still stored locally on-device for now).
 
@@ -27,3 +27,4 @@
 - v1: log entries (date, exercise, sets, reps, weight), view history,
   edit/delete, JSON export.
 - Autocomplete exercise names from existing history (custom dropdown, iOS Safari compatible).
+- Single-day share as print-to-PDF (opens formatted print page, saves to Files or shares via AirDrop/Mail on iPhone).
