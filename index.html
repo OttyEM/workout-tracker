@@ -427,6 +427,9 @@
     .cal-cell.selected .cal-dot { background: white; }
 
     .cal-detail-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       font-size: 0.95rem;
       font-weight: 600;
       color: #3a3a3c;
@@ -803,7 +806,10 @@
       .sort((a, b) => b.id.localeCompare(a.id));
     if (!rows.length) { el.innerHTML = ''; return; }
     el.innerHTML = `
-      <div class="cal-detail-header">${fmtDate(selectedCalDate)}</div>
+      <div class="cal-detail-header">
+        <span>${fmtDate(selectedCalDate)}</span>
+        <button class="btn btn-secondary btn-sm" onclick="shareDay('${selectedCalDate}')">Share</button>
+      </div>
       <div class="day-entries">${rows.map(entryHTML).join('')}</div>`;
   }
 
@@ -966,6 +972,59 @@
   }
 
   // ── Export ────────────────────────────────────────────────────────────────
+
+  function shareDay(date) {
+    const rows = loadAll()
+      .filter(r => r.date === date)
+      .sort((a, b) => b.id.localeCompare(a.id));
+    if (!rows.length) return;
+
+    const entries = rows.map(r => {
+      const unit = r.unit || 'lbs';
+      let html = '';
+      if (r.superset && r.exercise2) {
+        const sA = statsLine(r.sets,  r.reps,  r.weight,  r.tempo,  unit);
+        const sB = statsLine(r.sets2, r.reps2, r.weight2, r.tempo2, unit);
+        html += `<h3>${esc(r.exercise)} + ${esc(r.exercise2)}</h3>`;
+        html += `<p><strong>${esc(r.exercise)}:</strong> ${sA || '—'}</p>`;
+        if (r.comment)  html += `<p class="note">${esc(r.comment)}</p>`;
+        html += `<p><strong>${esc(r.exercise2)}:</strong> ${sB || '—'}</p>`;
+        if (r.comment2) html += `<p class="note">${esc(r.comment2)}</p>`;
+      } else {
+        const s = statsLine(r.sets, r.reps, r.weight, r.tempo, unit);
+        html += `<h3>${esc(r.exercise)}</h3>`;
+        if (s)         html += `<p>${s}</p>`;
+        if (r.comment) html += `<p class="note">${esc(r.comment)}</p>`;
+      }
+      return `<div class="entry">${html}</div>`;
+    }).join('');
+
+    const page = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Workout — ${fmtDate(date)}</title>
+  <style>
+    body { font-family: -apple-system, sans-serif; max-width: 600px; margin: 40px auto; padding: 0 24px; color: #1c1c1e; }
+    h1   { font-size: 1.4rem; margin: 0 0 4px; }
+    .sub { font-size: 0.9rem; color: #6c6c70; margin-bottom: 24px; }
+    .entry { border-top: 1px solid #e5e5ea; padding: 14px 0; }
+    h3   { font-size: 1rem; margin: 0 0 6px; }
+    p    { margin: 3px 0; font-size: 0.9rem; color: #3a3a3c; }
+    .note { color: #8e8e93; font-style: italic; }
+  </style>
+</head>
+<body>
+  <h1>Workout Tracker</h1>
+  <p class="sub">${fmtDate(date)}</p>
+  ${entries}
+  <script>window.print();<\/script>
+</body>
+</html>`;
+
+    const w = window.open('', '_blank');
+    if (w) { w.document.write(page); w.document.close(); }
+  }
 
   function exportData() {
     const blob = new Blob(
