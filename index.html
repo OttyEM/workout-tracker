@@ -39,7 +39,30 @@
     }
 
     /* ── Form fields ── */
-    .field { margin-bottom: 12px; }
+    .field { margin-bottom: 12px; position: relative; }
+
+    .suggestions {
+      position: absolute;
+      left: 0; right: 0;
+      background: white;
+      border: 1.5px solid #007aff;
+      border-top: none;
+      border-radius: 0 0 10px 10px;
+      overflow: hidden;
+      z-index: 200;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    }
+
+    .sugg-item {
+      padding: 11px 12px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      border-top: 1px solid #f2f2f7;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .sugg-item:first-child { border-top: none; }
+    .sugg-item:active { background: #f2f2f7; }
 
     label {
       display: block;
@@ -428,7 +451,9 @@
 
   <div class="field">
     <label for="inp-exercise" id="lbl-exercise">Exercise</label>
-    <input type="text" id="inp-exercise" placeholder="e.g. Squat" autocomplete="off" required>
+    <input type="text" id="inp-exercise" placeholder="e.g. Squat" autocomplete="off" required
+           oninput="showSugg(this,'sugg-ex')" onblur="hideSuggDelayed('sugg-ex')">
+    <div class="suggestions" id="sugg-ex"></div>
   </div>
 
   <div class="toggle-row">
@@ -485,7 +510,9 @@
 
     <div class="field">
       <label for="inp-exercise2">Exercise</label>
-      <input type="text" id="inp-exercise2" placeholder="e.g. Pull-up" autocomplete="off">
+      <input type="text" id="inp-exercise2" placeholder="e.g. Pull-up" autocomplete="off"
+             oninput="showSugg(this,'sugg-ex2')" onblur="hideSuggDelayed('sugg-ex2')">
+      <div class="suggestions" id="sugg-ex2"></div>
     </div>
 
     <div class="toggle-row">
@@ -558,6 +585,7 @@
   let calMonth = new Date().getMonth();
   let selectedCalDate = null;
   let currentUnit = 'lbs';
+  let allNames = [];
 
   // ── Storage ───────────────────────────────────────────────────────────────
 
@@ -673,12 +701,45 @@
 
   // ── Calendar ──────────────────────────────────────────────────────────────
 
+  function updateSuggestions() {
+    const rows = loadAll();
+    allNames = [...new Set([
+      ...rows.map(r => r.exercise),
+      ...rows.filter(r => r.exercise2).map(r => r.exercise2),
+    ])].filter(Boolean).sort((a, b) => a.localeCompare(b));
+  }
+
+  function showSugg(input, listId) {
+    const val = input.value.trim().toLowerCase();
+    const el  = document.getElementById(listId);
+    if (!val) { el.innerHTML = ''; return; }
+    const matches = allNames.filter(n => n.toLowerCase().startsWith(val));
+    const results = matches.length
+      ? matches
+      : allNames.filter(n => n.toLowerCase().includes(val));
+    el.innerHTML = results.slice(0, 6).map(n =>
+      `<div class="sugg-item" data-val="${esc(n)}"
+            onmousedown="event.preventDefault()"
+            onclick="pickSugg('${input.id}','${listId}',this.dataset.val)">${esc(n)}</div>`
+    ).join('');
+  }
+
+  function pickSugg(inputId, listId, value) {
+    document.getElementById(inputId).value = value;
+    document.getElementById(listId).innerHTML = '';
+  }
+
+  function hideSuggDelayed(listId) {
+    setTimeout(() => document.getElementById(listId).innerHTML = '', 150);
+  }
+
   function startNewEntry() {
     document.getElementById('inp-date').value = selectedCalDate || today();
     openForm();
   }
 
   function openForm() {
+    updateSuggestions();
     document.getElementById('view-form').style.display     = '';
     document.getElementById('view-calendar').style.display = 'none';
     document.getElementById('cancel-btn').style.display    = '';
