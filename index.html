@@ -302,6 +302,44 @@
 
     .fab:active { transform: scale(0.93); box-shadow: 0 2px 8px rgba(0,122,255,0.3); }
 
+    /* ── Unit picker ── */
+    .unit-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .unit-row span {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #6c6c70;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .unit-picker {
+      display: inline-flex;
+      border: 1.5px solid #d1d1d6;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .unit-btn {
+      padding: 5px 14px;
+      border: none;
+      background: transparent;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #6c6c70;
+      cursor: pointer;
+      min-height: 30px;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .unit-btn.active { background: #007aff; color: white; }
+    .unit-btn + .unit-btn { border-left: 1.5px solid #d1d1d6; }
+
     /* ── Calendar ── */
     .cal-nav {
       display: flex;
@@ -406,6 +444,14 @@
     <input type="text" id="inp-tempo" placeholder="3.0.0.1" pattern="\d+\.\d+\.\d+\.\d+">
   </div>
 
+  <div class="unit-row">
+    <span>Weight unit</span>
+    <div class="unit-picker">
+      <button type="button" class="unit-btn active" id="unit-lbs" onclick="setUnit('lbs')">lbs</button>
+      <button type="button" class="unit-btn" id="unit-kg" onclick="setUnit('kg')">kg</button>
+    </div>
+  </div>
+
   <div class="row">
     <div class="field">
       <label for="inp-sets">Sets</label>
@@ -416,7 +462,7 @@
       <input type="number" id="inp-reps" min="1" placeholder="10">
     </div>
     <div class="field">
-      <label for="inp-weight">Weight (lbs)</label>
+      <label for="inp-weight">Weight</label>
       <input type="number" id="inp-weight" min="0" step="0.5" placeholder="135">
     </div>
   </div>
@@ -465,7 +511,7 @@
         <input type="number" id="inp-reps2" min="1" placeholder="10">
       </div>
       <div class="field">
-        <label for="inp-weight2">Weight (lbs)</label>
+        <label for="inp-weight2">Weight</label>
         <input type="number" id="inp-weight2" min="0" step="0.5" placeholder="135">
       </div>
     </div>
@@ -511,6 +557,7 @@
   let calYear  = new Date().getFullYear();
   let calMonth = new Date().getMonth();
   let selectedCalDate = null;
+  let currentUnit = 'lbs';
 
   // ── Storage ───────────────────────────────────────────────────────────────
 
@@ -529,12 +576,18 @@
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  function statsLine(s, rp, w, t) {
+  function setUnit(unit) {
+    currentUnit = unit;
+    document.getElementById('unit-lbs').classList.toggle('active', unit === 'lbs');
+    document.getElementById('unit-kg').classList.toggle('active', unit === 'kg');
+  }
+
+  function statsLine(s, rp, w, t, unit) {
     return [
-      s  ? s  + ' sets'  : '',
-      rp ? rp + ' reps'  : '',
-      w  ? w  + ' lbs'   : '',
-      t  ? t  + ' tempo' : '',
+      s  ? s  + ' sets'              : '',
+      rp ? rp + ' reps'              : '',
+      w  ? w  + ' ' + (unit || 'lbs') : '',
+      t  ? t  + ' tempo'             : '',
     ].filter(Boolean).join(' · ');
   }
 
@@ -544,16 +597,17 @@
       : esc(r.exercise);
 
     let statsHTML;
+    const unit = r.unit || 'lbs';
     if (r.superset && r.exercise2) {
-      const sA = statsLine(r.sets,  r.reps,  r.weight,  r.tempo);
-      const sB = statsLine(r.sets2, r.reps2, r.weight2, r.tempo2);
+      const sA = statsLine(r.sets,  r.reps,  r.weight,  r.tempo,  unit);
+      const sB = statsLine(r.sets2, r.reps2, r.weight2, r.tempo2, unit);
       statsHTML = `
         <div class="entry-meta">${esc(r.exercise)}: ${sA || '—'}</div>
         ${r.comment  ? `<div class="entry-comment">${esc(r.comment)}</div>`  : ''}
         <div class="entry-meta">${esc(r.exercise2)}: ${sB || '—'}</div>
         ${r.comment2 ? `<div class="entry-comment">${esc(r.comment2)}</div>` : ''}`;
     } else {
-      const s = statsLine(r.sets, r.reps, r.weight, r.tempo);
+      const s = statsLine(r.sets, r.reps, r.weight, r.tempo, unit);
       statsHTML = (s ? `<div class="entry-meta">${s}</div>` : '')
         + (r.comment ? `<div class="entry-comment">${esc(r.comment)}</div>` : '');
     }
@@ -760,7 +814,8 @@
     }
 
     const rows = loadAll();
-    const entry = { date, exercise, sets, reps, weight, tempo, comment, superset, exercise2, sets2, reps2, weight2, tempo2, comment2 };
+    const unit  = currentUnit;
+    const entry = { date, exercise, sets, reps, weight, tempo, comment, unit, superset, exercise2, sets2, reps2, weight2, tempo2, comment2 };
 
     if (editingId) {
       const i = rows.findIndex(r => r.id === editingId);
@@ -787,6 +842,7 @@
     document.getElementById('inp-reps').value     = row.reps;
     document.getElementById('inp-weight').value   = row.weight;
 
+    setUnit(row.unit || 'lbs');
     const hasTempo = !!row.tempo;
     document.getElementById('tempo-toggle').checked      = hasTempo;
     document.getElementById('tempo-field').style.display = hasTempo ? '' : 'none';
@@ -821,6 +877,7 @@
   }
 
   function resetForm() {
+    setUnit('lbs');
     document.getElementById('inp-exercise').value        = '';
     document.getElementById('inp-sets').value             = '';
     document.getElementById('inp-reps').value             = '';
