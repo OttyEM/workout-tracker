@@ -810,6 +810,14 @@
       </div>
     </div>
 
+    <div class="unit-row">
+      <span>Weight unit</span>
+      <div class="unit-picker">
+        <button type="button" class="unit-btn active" id="unit2-lbs" onclick="setUnit2('lbs')">lbs</button>
+        <button type="button" class="unit-btn" id="unit2-kg" onclick="setUnit2('kg')">kg</button>
+      </div>
+    </div>
+
     <div class="row">
       <div class="field">
         <label for="inp-sets2">Sets</label>
@@ -884,7 +892,8 @@
   let calYear  = new Date().getFullYear();
   let calMonth = new Date().getMonth();
   let selectedCalDate = null;
-  let currentUnit = 'lbs';
+  let currentUnit  = 'lbs';
+  let currentUnit2 = 'lbs';
   let allNames = [];
   let currentView = 'calendar';
   let selectedMovement = null;
@@ -901,7 +910,7 @@
     if (sb && currentUser) {
       const payload = rows.map(r => ({ ...r, user_id: currentUser.id }));
       sb.from('workouts').upsert(payload, { onConflict: 'id' })
-        .then(({ error }) => { if (error) console.error('Supabase save error:', error); })
+        .then(({ error }) => { if (error) { console.error('Supabase save error:', error); alert('Cloud sync failed — your change is saved locally but may not appear on other devices. Check the console for details.'); } })
         .catch(e => console.error('Supabase save exception:', e));
     }
   }
@@ -916,6 +925,12 @@
     currentUnit = unit;
     document.getElementById('unit-lbs').classList.toggle('active', unit === 'lbs');
     document.getElementById('unit-kg').classList.toggle('active', unit === 'kg');
+  }
+
+  function setUnit2(unit) {
+    currentUnit2 = unit;
+    document.getElementById('unit2-lbs').classList.toggle('active', unit === 'lbs');
+    document.getElementById('unit2-kg').classList.toggle('active', unit === 'kg');
   }
 
   function statsLine(s, rp, w, t, unit) {
@@ -933,10 +948,11 @@
       : esc(r.exercise);
 
     let statsHTML;
-    const unit = r.unit || 'lbs';
+    const unit  = r.unit  || 'lbs';
+    const unit2 = r.unit2 || r.unit || 'lbs';
     if (r.superset && r.exercise2) {
       const sA = statsLine(r.sets,  r.reps,  r.weight,  r.tempo,  unit);
-      const sB = statsLine(r.sets2, r.reps2, r.weight2, r.tempo2, unit);
+      const sB = statsLine(r.sets2, r.reps2, r.weight2, r.tempo2, unit2);
       statsHTML = `
         <div class="entry-meta">${esc(r.exercise)}: ${sA || '—'}</div>
         ${r.comment  ? `<div class="entry-comment">${esc(r.comment)}</div>`  : ''}
@@ -1169,11 +1185,12 @@
     }
 
     html += rows.map(r => {
-      const unit = r.unit || 'lbs';
-      const isA  = r.exercise === name;
-      const s    = isA
+      const unit  = r.unit  || 'lbs';
+      const unit2 = r.unit2 || r.unit || 'lbs';
+      const isA   = r.exercise === name;
+      const s     = isA
         ? statsLine(r.sets,  r.reps,  r.weight,  r.tempo,  unit)
-        : statsLine(r.sets2, r.reps2, r.weight2, r.tempo2, unit);
+        : statsLine(r.sets2, r.reps2, r.weight2, r.tempo2, unit2);
       const comment = isA ? r.comment : r.comment2;
       const partner = r.superset && r.exercise2
         ? (isA ? r.exercise2 : r.exercise)
@@ -1383,7 +1400,8 @@
 
 const rows = loadAll();
     const unit  = currentUnit;
-    const entry = { date, exercise, sets, reps, weight, tempo, comment, unit, superset, exercise2, sets2, reps2, weight2, tempo2, comment2 };
+    const unit2 = currentUnit2;
+    const entry = { date, exercise, sets, reps, weight, tempo, comment, unit, superset, exercise2, sets2, reps2, weight2, tempo2, comment2, unit2 };
 
     if (editingId) {
       const i = rows.findIndex(r => r.id === editingId);
@@ -1410,7 +1428,8 @@ const rows = loadAll();
     document.getElementById('inp-reps').value     = row.reps;
     document.getElementById('inp-weight').value   = row.weight;
 
-    setUnit(row.unit || 'lbs');
+    setUnit(row.unit   || 'lbs');
+    setUnit2(row.unit2 || 'lbs');
     const hasTempo = !!row.tempo;
     document.getElementById('tempo-toggle').checked      = hasTempo;
     document.getElementById('tempo-field').style.display = hasTempo ? '' : 'none';
@@ -1446,6 +1465,7 @@ const rows = loadAll();
 
   function resetForm() {
     setUnit('lbs');
+    setUnit2('lbs');
     document.getElementById('inp-exercise').value        = '';
     document.getElementById('inp-sets').value             = '';
     document.getElementById('inp-reps').value             = '';
@@ -1482,11 +1502,12 @@ const rows = loadAll();
     if (!rows.length) return;
 
     const entries = rows.map(r => {
-      const unit = r.unit || 'lbs';
+      const unit  = r.unit  || 'lbs';
+      const unit2 = r.unit2 || r.unit || 'lbs';
       let html = '';
       if (r.superset && r.exercise2) {
         const sA = statsLine(r.sets,  r.reps,  r.weight,  r.tempo,  unit);
-        const sB = statsLine(r.sets2, r.reps2, r.weight2, r.tempo2, unit);
+        const sB = statsLine(r.sets2, r.reps2, r.weight2, r.tempo2, unit2);
         html += `<h3>${esc(r.exercise)} + ${esc(r.exercise2)}</h3>`;
         html += `<p><strong>${esc(r.exercise)}:</strong> ${sA || '—'}</p>`;
         if (r.comment)  html += `<p class="note">${esc(r.comment)}</p>`;
@@ -1695,7 +1716,9 @@ const rows = loadAll();
       currentUser = session?.user ?? null;
       if (currentUser) {
         document.getElementById('auth-overlay').style.display = 'none';
-        pullFromSupabase().then(() => showMainView('calendar'));
+        if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
+          pullFromSupabase().then(() => showMainView('calendar'));
+        }
       } else {
         document.getElementById('auth-overlay').style.display = 'flex';
       }
