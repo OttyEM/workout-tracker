@@ -25,6 +25,13 @@ superset, exercise2, sets2, reps2, weight2, tempo2, comment2
 - `superset: true` means the entry has a second exercise (exercise2 and its fields)
 - Fields are empty strings `""` when not filled in, never `null`
 
+## Navigation
+- Hamburger button (top-left) opens a slide-out drawer with two sections: **Workout** and **Movement List**.
+- `currentView` state variable tracks the active view (`'calendar'` or `'movements'`).
+- `showMainView(view)` switches views, updates the drawer active state, and hides/shows the FAB.
+- The FAB (log workout button) is hidden on the Movement List view.
+- The FAB must be placed in the HTML *before* the `<script>` block so it exists in the DOM when boot code runs.
+
 ## UI patterns (follow these for new features)
 - Toggle switches for optional fields (tempo, superset already use this)
 - Card-based layout with 14px border-radius, soft shadow
