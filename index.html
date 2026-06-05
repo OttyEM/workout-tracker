@@ -111,6 +111,50 @@
 
     .movement-item-chevron { color: #c7c7cc; font-size: 1.1rem; flex-shrink: 0; }
 
+    /* ── RM grid ── */
+    .rm-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .rm-card {
+      background: white;
+      border-radius: 12px;
+      padding: 12px 6px;
+      text-align: center;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    .rm-card:active { opacity: 0.6; }
+
+    .rm-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: #8e8e93;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 5px;
+    }
+
+    .rm-value {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #1c1c1e;
+    }
+
+    .rm-unit {
+      font-size: 0.7rem;
+      color: #8e8e93;
+      margin-top: 3px;
+    }
+
+    .rm-manual { color: #007aff; }
+
     /* ── Movement detail ── */
     .movement-session {
       background: white;
@@ -904,6 +948,72 @@
     }).join('');
   }
 
+  // ── RM storage ────────────────────────────────────────────────────────────
+
+  function loadRMs() {
+    try { return JSON.parse(localStorage.getItem('rms_v1')) || {}; }
+    catch { return {}; }
+  }
+
+  function saveRMs(data) { localStorage.setItem('rms_v1', JSON.stringify(data)); }
+
+  function calcAutoRMs(name) {
+    const rows = loadAll().filter(r => r.exercise === name || r.exercise2 === name);
+    const result = {};
+    [1, 3, 5, 10].forEach(rep => {
+      let best = 0;
+      rows.forEach(r => {
+        const isA = r.exercise === name;
+        const w   = parseFloat(isA ? r.weight : r.weight2) || 0;
+        const rp  = parseInt(  isA ? r.reps   : r.reps2)   || 0;
+        if (rp === rep && w > best) best = w;
+      });
+      if (best) result[rep] = best;
+    });
+    return result;
+  }
+
+  function editRM(rep) {
+    const name    = selectedMovement;
+    const auto    = calcAutoRMs(name);
+    const manuals = loadRMs()[name] || {};
+    const current = Math.max(auto[rep] || 0, manuals[rep] || 0);
+    const input   = prompt(`Set ${rep}RM for ${name} (clear to reset to auto):`, current || '');
+    if (input === null) return;
+    const val = parseFloat(input);
+    const all = loadRMs();
+    if (!all[name]) all[name] = {};
+    if (!isNaN(val) && val > 0) {
+      all[name][rep] = val;
+    } else {
+      delete all[name][rep];
+    }
+    saveRMs(all);
+    renderMovementDetail();
+  }
+
+  function rmSectionHTML(name) {
+    const auto    = calcAutoRMs(name);
+    const manuals = loadRMs()[name] || {};
+    const rows    = loadAll().filter(r => r.exercise === name || r.exercise2 === name)
+                             .sort((a, b) => b.date.localeCompare(a.date));
+    const unit    = rows.length ? (rows[0].unit || 'lbs') : 'lbs';
+
+    const cards = [1, 3, 5, 10].map(rep => {
+      const autoVal   = auto[rep]    || 0;
+      const manualVal = manuals[rep] || 0;
+      const val       = Math.max(autoVal, manualVal);
+      const isManual  = manualVal > autoVal;
+      return `<div class="rm-card" onclick="editRM(${rep})">
+        <div class="rm-label">${rep}RM</div>
+        <div class="rm-value ${isManual ? 'rm-manual' : ''}">${val || '—'}</div>
+        ${val ? `<div class="rm-unit">${unit}</div>` : ''}
+      </div>`;
+    }).join('');
+
+    return `<div class="rm-grid">${cards}</div>`;
+  }
+
   function navigateToMovement(name) {
     selectedMovement = name;
     showMainView('movement-detail');
@@ -918,9 +1028,10 @@
 
     const el = document.getElementById('view-movement-detail');
     let html = `<div class="back-link" onclick="showMainView('movements')"><span style="font-size:1.5rem;line-height:1">‹</span> Movement List</div>`;
+    html += rmSectionHTML(name);
 
     if (!rows.length) {
-      el.innerHTML = html + `<div class="empty">No sessions found.</div>`;
+      el.innerHTML = html + `<div class="empty">No sessions logged yet.</div>`;
       return;
     }
 
