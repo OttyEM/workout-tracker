@@ -844,6 +844,8 @@
       <span id="cal-month-label" class="cal-month-label"></span>
       <button class="btn btn-secondary btn-sm" onclick="changeMonth(1)">›</button>
       <button class="btn btn-secondary btn-sm" onclick="exportData()">Export</button>
+      <button class="btn btn-secondary btn-sm" onclick="document.getElementById('program-file').click()">Import</button>
+      <input type="file" id="program-file" accept=".json" style="display:none" onchange="handleProgramFile(this)">
     </div>
     <div class="cal-weekdays">
       <div class="cal-weekday">Su</div>
@@ -973,7 +975,7 @@
     const groups = {};
     rows.forEach(r => { (groups[r.date] = groups[r.date] || []).push(r); });
     const dates = Object.keys(groups).sort((a, b) => b.localeCompare(a));
-    dates.forEach(d => groups[d].sort((a, b) => b.id.localeCompare(a.id)));
+    // entries within each day keep their natural insertion order
 
     title.textContent = `Past Workouts (${dates.length})`;
 
@@ -1287,8 +1289,7 @@
     const el = document.getElementById('cal-day-detail');
     if (!selectedCalDate) { el.innerHTML = ''; return; }
     const rows = loadAll()
-      .filter(r => r.date === selectedCalDate)
-      .sort((a, b) => b.id.localeCompare(a.id));
+      .filter(r => r.date === selectedCalDate);
     if (!rows.length) { el.innerHTML = ''; return; }
     el.innerHTML = `
       <div class="cal-detail-header">
@@ -1477,8 +1478,7 @@ const rows = loadAll();
 
   function shareDay(date) {
     const rows = loadAll()
-      .filter(r => r.date === date)
-      .sort((a, b) => b.id.localeCompare(a.id));
+      .filter(r => r.date === date);
     if (!rows.length) return;
 
     const entries = rows.map(r => {
@@ -1559,11 +1559,66 @@ const rows = loadAll();
     });
   }
 
+  // ── Program import ────────────────────────────────────────────────────────
+
+  function handleProgramFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        importProgram(JSON.parse(e.target.result));
+      } catch {
+        alert('Could not read file — make sure it is valid JSON.');
+      }
+      input.value = '';
+    };
+    reader.readAsText(file);
+  }
+
+  function importProgram(prog) {
+    if (!prog.days || !Array.isArray(prog.days)) {
+      alert('Invalid program: expected a "days" array.');
+      return;
+    }
+    const rows = loadAll();
+    let count = 0;
+    const importBase = Date.now();
+    prog.days.forEach(day => {
+      if (!day.date || !Array.isArray(day.exercises)) return;
+      day.exercises.forEach(ex => {
+        if (!ex.exercise) return;
+        rows.push({
+          id:        (importBase + count * 10).toString(36) + Math.random().toString(36).slice(2, 6),
+          date:      day.date,
+          exercise:  ex.exercise,
+          sets:      ex.sets      || '',
+          reps:      ex.reps      || '',
+          weight:    '',
+          tempo:     ex.tempo     || '',
+          comment:   ex.comment   || '',
+          unit:      ex.unit      || 'lbs',
+          superset:  !!ex.superset,
+          exercise2: ex.exercise2 || '',
+          sets2:     ex.sets2     || '',
+          reps2:     ex.reps2     || '',
+          weight2:   '',
+          tempo2:    ex.tempo2    || '',
+          comment2:  ex.comment2  || '',
+        });
+        count++;
+      });
+    });
+    saveAll(rows);
+    renderCalendar();
+    alert(`Imported ${count} exercise${count !== 1 ? 's' : ''} across ${prog.days.length} day${prog.days.length !== 1 ? 's' : ''}.`);
+  }
+
   // ── Auth & sync ───────────────────────────────────────────────────────────
 
   async function pullFromSupabase() {
     try {
-      const { data: workouts, error: wErr } = await sb.from('workouts').select('*');
+      const { data: workouts, error: wErr } = await sb.from('workouts').select('*').order('id', { ascending: true });
       if (wErr) { console.error('Pull workouts error:', wErr); }
       else {
         const rows = (workouts || []).map(({ user_id, ...r }) => r);

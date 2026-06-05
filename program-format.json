@@ -1,0 +1,43 @@
+{
+  "days": [
+    {
+      "date": "2026-06-09",
+      "exercises": [
+        {
+          "exercise": "Squat",
+          "sets": "3",
+          "reps": "5",
+          "unit": "lbs"
+        },
+        {
+          "exercise": "Bench Press",
+          "sets": "3",
+          "reps": "8",
+          "unit": "lbs",
+          "tempo": "3.0.1.0",
+          "comment": "Keep elbows at 45 degrees"
+        }
+      ]
+    },
+    {
+      "date": "2026-06-11",
+      "exercises": [
+        {
+          "exercise": "Deadlift",
+          "sets": "1",
+          "reps": "5",
+          "unit": "kg"
+        },
+        {
+          "exercise": "Pull-up",
+          "sets": "3",
+          "reps": "8",
+          "superset": true,
+          "exercise2": "Dip",
+          "sets2": "3",
+          "reps2": "10"
+        }
+      ]
+    }
+  ]
+}
