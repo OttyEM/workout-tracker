@@ -15,8 +15,8 @@
   history of every time it was done, with sets and reps.~~
 
 ## Phase 3 — Online database (cross-device access)
-- Move data to an online database so the same data is available on both
-  laptop and phone.
+- ~~Move data to an online database so the same data is available on both
+  laptop and phone.~~
 
 ## Phase 4 — Advanced / AI / long term
 - Auto-parse a photo of my week's workouts and file each entry into the
