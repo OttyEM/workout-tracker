@@ -439,6 +439,19 @@
       border-top: 1px solid #f2f2f7;
     }
 
+    /* ── Tempo fields ── */
+    .tempo-fields { display: flex; align-items: center; gap: 6px; }
+
+    .tempo-part {
+      width: 52px !important;
+      text-align: center;
+      padding: 10px 4px;
+      font-size: 1.2rem;
+      font-weight: 600;
+    }
+
+    .tempo-dot { font-size: 1.3rem; color: #8e8e93; font-weight: 700; flex-shrink: 0; }
+
     /* ── Tempo toggle ── */
     .toggle-row {
       display: flex;
@@ -718,8 +731,16 @@
   </div>
 
   <div class="field" id="tempo-field" style="display:none">
-    <label for="inp-tempo">Tempo (eccentric · pause · concentric · pause)</label>
-    <input type="text" id="inp-tempo" placeholder="3.0.0.1" pattern="\d+\.\d+\.\d+\.\d+">
+    <label>Tempo (eccentric · pause · concentric · pause)</label>
+    <div class="tempo-fields">
+      <input type="text" id="inp-tempo-a" class="tempo-part" maxlength="1" autocomplete="off" oninput="onTempoPartInput(this,'inp-tempo-b')">
+      <span class="tempo-dot">·</span>
+      <input type="text" id="inp-tempo-b" class="tempo-part" maxlength="1" autocomplete="off" oninput="onTempoPartInput(this,'inp-tempo-c')">
+      <span class="tempo-dot">·</span>
+      <input type="text" id="inp-tempo-c" class="tempo-part" maxlength="1" autocomplete="off" oninput="onTempoPartInput(this,'inp-tempo-d')">
+      <span class="tempo-dot">·</span>
+      <input type="text" id="inp-tempo-d" class="tempo-part" maxlength="1" autocomplete="off" oninput="onTempoPartInput(this,null)">
+    </div>
   </div>
 
   <div class="unit-row">
@@ -777,8 +798,16 @@
     </div>
 
     <div class="field" id="tempo-field-2" style="display:none">
-      <label for="inp-tempo-2">Tempo (eccentric · pause · concentric · pause)</label>
-      <input type="text" id="inp-tempo-2" placeholder="3.0.0.1" pattern="\d+\.\d+\.\d+\.\d+">
+      <label>Tempo (eccentric · pause · concentric · pause)</label>
+      <div class="tempo-fields">
+        <input type="text" id="inp-tempo2-a" class="tempo-part" maxlength="1" autocomplete="off" oninput="onTempoPartInput(this,'inp-tempo2-b')">
+        <span class="tempo-dot">·</span>
+        <input type="text" id="inp-tempo2-b" class="tempo-part" maxlength="1" autocomplete="off" oninput="onTempoPartInput(this,'inp-tempo2-c')">
+        <span class="tempo-dot">·</span>
+        <input type="text" id="inp-tempo2-c" class="tempo-part" maxlength="1" autocomplete="off" oninput="onTempoPartInput(this,'inp-tempo2-d')">
+        <span class="tempo-dot">·</span>
+        <input type="text" id="inp-tempo2-d" class="tempo-part" maxlength="1" autocomplete="off" oninput="onTempoPartInput(this,null)">
+      </div>
     </div>
 
     <div class="row">
@@ -1269,13 +1298,38 @@
       <div class="day-entries">${rows.map(entryHTML).join('')}</div>`;
   }
 
+  // ── Tempo fields ──────────────────────────────────────────────────────────
+
+  function onTempoPartInput(el, nextId) {
+    el.value = el.value.replace(/[^0-9xX]/g, '').slice(-1);
+    if (el.value && nextId) document.getElementById(nextId).focus();
+  }
+
+  function getTempoStr(ex) {
+    const parts = ['a','b','c','d'].map(p =>
+      document.getElementById(`inp-tempo${ex}-${p}`).value.trim()
+    );
+    if (parts.every(v => v === '') || parts.some(v => v === '')) return '';
+    return parts.join('.');
+  }
+
+  function setTempoStr(ex, val) {
+    const parts = val ? val.split('.') : [];
+    ['a','b','c','d'].forEach((p, i) => {
+      document.getElementById(`inp-tempo${ex}-${p}`).value = parts[i] || '';
+    });
+  }
+
+  function clearTempoStr(ex) { setTempoStr(ex, ''); }
+
   // ── Tempo toggle ──────────────────────────────────────────────────────────
 
   function onTempoToggle(num) {
     const sfx = num === 2 ? '-2' : '';
+    const ex  = num === 2 ? '2'  : '';
     const on = document.getElementById(`tempo-toggle${sfx}`).checked;
     document.getElementById(`tempo-field${sfx}`).style.display = on ? '' : 'none';
-    if (!on) document.getElementById(`inp-tempo${sfx}`).value = '';
+    if (!on) clearTempoStr(ex);
   }
 
   // ── Superset toggle ───────────────────────────────────────────────────────
@@ -1295,7 +1349,7 @@
     document.getElementById('inp-comment2').value           = '';
     document.getElementById('tempo-toggle-2').checked       = false;
     document.getElementById('tempo-field-2').style.display = 'none';
-    document.getElementById('inp-tempo-2').value            = '';
+    clearTempoStr('2');
   }
 
   // ── Save ──────────────────────────────────────────────────────────────────
@@ -1306,14 +1360,14 @@
     const sets      = document.getElementById('inp-sets').value.trim();
     const reps      = document.getElementById('inp-reps').value.trim();
     const weight    = document.getElementById('inp-weight').value.trim();
-    const tempo     = document.getElementById('inp-tempo').value.trim();
+    const tempo     = getTempoStr('');
     const comment   = document.getElementById('inp-comment').value.trim();
     const superset  = document.getElementById('superset-toggle').checked;
     const exercise2 = superset ? document.getElementById('inp-exercise2').value.trim()  : '';
     const sets2     = superset ? document.getElementById('inp-sets2').value.trim()      : '';
     const reps2     = superset ? document.getElementById('inp-reps2').value.trim()      : '';
     const weight2   = superset ? document.getElementById('inp-weight2').value.trim()    : '';
-    const tempo2    = superset ? document.getElementById('inp-tempo-2').value.trim()    : '';
+    const tempo2    = superset ? getTempoStr('2')                                       : '';
     const comment2  = superset ? document.getElementById('inp-comment2').value.trim()   : '';
 
     if (!date || !exercise) {
@@ -1326,17 +1380,7 @@
       return;
     }
 
-    if (tempo && !/^\d+\.\d+\.\d+\.\d+$/.test(tempo)) {
-      alert('Tempo A must be in #.#.#.# format, e.g. 3.0.0.1');
-      return;
-    }
-
-    if (tempo2 && !/^\d+\.\d+\.\d+\.\d+$/.test(tempo2)) {
-      alert('Tempo B must be in #.#.#.# format, e.g. 3.0.0.1');
-      return;
-    }
-
-    const rows = loadAll();
+const rows = loadAll();
     const unit  = currentUnit;
     const entry = { date, exercise, sets, reps, weight, tempo, comment, unit, superset, exercise2, sets2, reps2, weight2, tempo2, comment2 };
 
@@ -1369,7 +1413,7 @@
     const hasTempo = !!row.tempo;
     document.getElementById('tempo-toggle').checked      = hasTempo;
     document.getElementById('tempo-field').style.display = hasTempo ? '' : 'none';
-    document.getElementById('inp-tempo').value            = row.tempo   || '';
+    setTempoStr('', row.tempo || '');
     document.getElementById('inp-comment').value          = row.comment || '';
 
     const isSuperset = !!row.superset;
@@ -1385,7 +1429,7 @@
       const hasTempo2 = !!row.tempo2;
       document.getElementById('tempo-toggle-2').checked       = hasTempo2;
       document.getElementById('tempo-field-2').style.display = hasTempo2 ? '' : 'none';
-      document.getElementById('inp-tempo-2').value            = row.tempo2 || '';
+      setTempoStr('2', row.tempo2 || '');
     }
 
     document.getElementById('form-title').textContent = 'Edit Workout';
@@ -1407,7 +1451,7 @@
     document.getElementById('inp-weight').value           = '';
     document.getElementById('tempo-toggle').checked       = false;
     document.getElementById('tempo-field').style.display = 'none';
-    document.getElementById('inp-tempo').value            = '';
+    clearTempoStr('');
     document.getElementById('inp-comment').value          = '';
     document.getElementById('superset-toggle').checked          = false;
     document.getElementById('superset-section').style.display  = 'none';
