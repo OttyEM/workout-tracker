@@ -7,12 +7,12 @@
   (data still stored locally on-device for now).~~
 
 ## Phase 2 — Movement-centric structure
-- Left-hand navigation menu with two sections: "Workout" and "Movement list".
-- Movement list page showing every movement I've used.
-- Auto-calculate RMs (1RM, 3RM, 5RM, 10RM) from logged sets, with the
-  option to enter an RM manually instead.
-- Movement detail page: open a movement to see its RMs and the full
-  history of every time it was done, with sets and reps.
+- ~~Left-hand navigation menu with two sections: "Workout" and "Movement list".~~
+- ~~Movement list page showing every movement I've used.~~
+- ~~Auto-calculate RMs (1RM, 3RM, 5RM, 10RM) from logged sets, with the
+  option to enter an RM manually instead.~~
+- ~~Movement detail page: open a movement to see its RMs and the full
+  history of every time it was done, with sets and reps.~~
 
 ## Phase 3 — Online database (cross-device access)
 - Move data to an online database so the same data is available on both
