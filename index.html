@@ -16,10 +16,92 @@
       padding: 20px 16px 48px;
     }
 
-    h1 {
-      font-size: 1.7rem;
-      font-weight: 700;
+    /* ── App header ── */
+    .app-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
       margin-bottom: 20px;
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin: 0;
+    }
+
+    .hamburger {
+      background: none;
+      border: none;
+      font-size: 2rem;
+      cursor: pointer;
+      padding: 4px 8px;
+      color: #1c1c1e;
+      -webkit-tap-highlight-color: transparent;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+
+    /* ── Drawer ── */
+    .drawer-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.35);
+      z-index: 300;
+    }
+
+    .drawer-overlay.open { display: block; }
+
+    #drawer {
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      width: 240px;
+      background: white;
+      z-index: 400;
+      transform: translateX(-100%);
+      transition: transform 0.25s ease;
+      box-shadow: 4px 0 20px rgba(0,0,0,0.12);
+      display: flex;
+      flex-direction: column;
+    }
+
+    #drawer.open { transform: translateX(0); }
+
+    .drawer-title {
+      font-size: 1rem;
+      font-weight: 700;
+      padding: 60px 20px 16px;
+      border-bottom: 1px solid #f2f2f7;
+      color: #1c1c1e;
+    }
+
+    .drawer-item {
+      padding: 15px 20px;
+      font-size: 1rem;
+      font-weight: 500;
+      color: #3a3a3c;
+      cursor: pointer;
+      border-bottom: 1px solid #f2f2f7;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    .drawer-item:active { background: #f2f2f7; }
+    .drawer-item.active { color: #007aff; font-weight: 600; }
+
+    /* ── Movement list ── */
+    .movement-item {
+      background: white;
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 1rem;
+      font-weight: 500;
     }
 
     /* ── Cards ── */
@@ -439,7 +521,21 @@
 </head>
 <body>
 
-<h1>Workout Tracker</h1>
+<!-- Drawer overlay -->
+<div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
+
+<!-- Slide-out drawer -->
+<nav id="drawer">
+  <div class="drawer-title">Workout Tracker</div>
+  <div class="drawer-item active" id="nav-workout" onclick="navigateTo('calendar')">Workout</div>
+  <div class="drawer-item" id="nav-movements" onclick="navigateTo('movements')">Movement List</div>
+</nav>
+
+<!-- App header -->
+<header class="app-header">
+  <button class="hamburger" onclick="openDrawer()" aria-label="Menu">&#9776;</button>
+  <h1 id="page-title">Workout Tracker</h1>
+</header>
 
 <div id="view-form" style="display:none">
 
@@ -580,6 +676,10 @@
   <div id="cal-day-detail"></div>
 </div>
 
+<div id="view-movements" style="display:none"></div>
+
+<button class="fab" onclick="startNewEntry()" aria-label="Log workout">+</button>
+
 <script>
   const KEY = 'workouts_v1';
   let editingId = null;
@@ -589,6 +689,7 @@
   let selectedCalDate = null;
   let currentUnit = 'lbs';
   let allNames = [];
+  let currentView = 'calendar';
 
   // ── Storage ───────────────────────────────────────────────────────────────
 
@@ -702,6 +803,57 @@
     render();
   }
 
+  // ── Navigation ────────────────────────────────────────────────────────────
+
+  function openDrawer() {
+    document.getElementById('drawer').classList.add('open');
+    document.getElementById('drawer-overlay').classList.add('open');
+  }
+
+  function closeDrawer() {
+    document.getElementById('drawer').classList.remove('open');
+    document.getElementById('drawer-overlay').classList.remove('open');
+  }
+
+  function navigateTo(view) {
+    closeDrawer();
+    showMainView(view);
+  }
+
+  function showMainView(view) {
+    currentView = view;
+    document.getElementById('view-calendar').style.display  = view === 'calendar'  ? '' : 'none';
+    document.getElementById('view-movements').style.display = view === 'movements' ? '' : 'none';
+    document.querySelector('.fab').style.display            = view === 'calendar'  ? '' : 'none';
+    document.getElementById('nav-workout').classList.toggle('active',   view === 'calendar');
+    document.getElementById('nav-movements').classList.toggle('active', view === 'movements');
+    document.getElementById('page-title').textContent =
+      view === 'movements' ? 'Movement List' : 'Workout Tracker';
+    if (view === 'movements') renderMovements();
+    if (view === 'calendar')  renderCalendar();
+  }
+
+  function renderMovements() {
+    const rows = loadAll();
+    const names = [...new Set([
+      ...rows.map(r => r.exercise),
+      ...rows.filter(r => r.exercise2).map(r => r.exercise2),
+    ])].filter(Boolean).sort((a, b) => a.localeCompare(b));
+
+    const el = document.getElementById('view-movements');
+    if (!names.length) {
+      el.innerHTML = '<div class="empty">No movements logged yet.</div>';
+      return;
+    }
+    el.innerHTML = names.map(name => {
+      const count = rows.filter(r => r.exercise === name || r.exercise2 === name).length;
+      return `<div class="movement-item">
+        <span>${esc(name)}</span>
+        <span style="color:#8e8e93;font-size:0.82rem">${count} session${count !== 1 ? 's' : ''}</span>
+      </div>`;
+    }).join('');
+  }
+
   // ── Calendar ──────────────────────────────────────────────────────────────
 
   function updateSuggestions() {
@@ -751,9 +903,8 @@
 
   function closeForm() {
     resetForm();
-    document.getElementById('view-form').style.display     = 'none';
-    document.getElementById('view-calendar').style.display = '';
-    renderCalendar();
+    document.getElementById('view-form').style.display = 'none';
+    showMainView(currentView);
   }
 
   function changeMonth(delta) {
@@ -1059,8 +1210,7 @@
 
   // ── Boot ──────────────────────────────────────────────────────────────────
 
-  renderCalendar();
+  showMainView('calendar');
 </script>
-<button class="fab" onclick="startNewEntry()" aria-label="Log workout">+</button>
 </body>
 </html>
