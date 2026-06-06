@@ -977,6 +977,7 @@
   let allNames = [];
   let currentView = 'calendar';
   let selectedMovement = null;
+  let movementSearch = '';
 
   // ── Timer state ───────────────────────────────────────────────────────────
   let timerPreset   = 90;
@@ -1137,6 +1138,7 @@
     document.getElementById('nav-movements').classList.toggle('active', view === 'movements' || view === 'movement-detail');
     document.getElementById('nav-clock').classList.toggle('active',     view === 'clock');
     if (view === 'movements') {
+      movementSearch = '';
       document.getElementById('page-title').textContent = 'Movement List';
       renderMovements();
     } else if (view === 'movement-detail') {
@@ -1153,7 +1155,7 @@
 
   function renderMovements() {
     const rows = loadAll();
-    const names = [...new Set([
+    let names = [...new Set([
       ...rows.map(r => r.exercise),
       ...rows.filter(r => r.exercise2).map(r => r.exercise2),
     ])].filter(Boolean).sort((a, b) => a.localeCompare(b));
@@ -1163,16 +1165,34 @@
       el.innerHTML = '<div class="empty">No movements logged yet.</div>';
       return;
     }
-    el.innerHTML = names.map(name => {
-      const count = rows.filter(r => r.exercise === name || r.exercise2 === name).length;
-      return `<div class="movement-item" onclick="navigateToMovement('${esc(name)}')">
-        <div>
-          <div>${esc(name)}</div>
-          <div style="color:#8e8e93;font-size:0.82rem;font-weight:400;margin-top:2px">${count} session${count !== 1 ? 's' : ''}</div>
-        </div>
-        <span class="movement-item-chevron">›</span>
-      </div>`;
-    }).join('');
+
+    const q = movementSearch.toLowerCase();
+    const filtered = q ? names.filter(n => n.toLowerCase().includes(q)) : names;
+
+    const listHTML = filtered.length
+      ? filtered.map(name => {
+          const count = rows.filter(r => r.exercise === name || r.exercise2 === name).length;
+          return `<div class="movement-item" onclick="navigateToMovement('${esc(name)}')">
+            <div>
+              <div>${esc(name)}</div>
+              <div style="color:#8e8e93;font-size:0.82rem;font-weight:400;margin-top:2px">${count} session${count !== 1 ? 's' : ''}</div>
+            </div>
+            <span class="movement-item-chevron">›</span>
+          </div>`;
+        }).join('')
+      : '<div class="empty">No matches.</div>';
+
+    el.innerHTML = `
+      <div style="padding:0 0 12px">
+        <input type="search" id="movement-search" placeholder="Search…" value="${esc(movementSearch)}"
+          oninput="movementSearch=this.value;renderMovements();document.getElementById('movement-search').focus();"
+          style="width:100%;padding:10px 14px;border:1.5px solid #e5e5ea;border-radius:10px;font-size:1rem;background:white;color:#1c1c1e;-webkit-appearance:none;">
+      </div>
+      ${listHTML}`;
+
+    const input = document.getElementById('movement-search');
+    const len = input.value.length;
+    input.setSelectionRange(len, len);
   }
 
   // ── RM storage ────────────────────────────────────────────────────────────
