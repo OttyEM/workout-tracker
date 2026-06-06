@@ -414,34 +414,6 @@
       min-height: 56px;
       border-radius: 14px;
     }
-    .clock-mode-bar {
-      display: flex;
-      background: #e5e5ea;
-      border-radius: 10px;
-      padding: 2px;
-      gap: 2px;
-      width: 100%;
-      margin-bottom: 8px;
-    }
-    .clock-mode-btn {
-      flex: 1;
-      padding: 7px 2px;
-      border: none;
-      border-radius: 8px;
-      background: transparent;
-      font-size: 0.72rem;
-      font-weight: 600;
-      color: #3a3a3c;
-      cursor: pointer;
-      min-height: 36px;
-      -webkit-tap-highlight-color: transparent;
-      transition: background 0.15s, color 0.15s;
-    }
-    .clock-mode-btn.active {
-      background: white;
-      color: #007aff;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.12);
-    }
 
     /* ── Toolbar ── */
     .toolbar {
@@ -800,7 +772,7 @@
   <div class="drawer-title">Workout Tracker</div>
   <div class="drawer-item active" id="nav-workout" onclick="navigateTo('calendar')">Workout</div>
   <div class="drawer-item" id="nav-movements" onclick="navigateTo('movements')">Movement List</div>
-  <div class="drawer-item" id="nav-clock" onclick="navigateTo('clock')">Clock</div>
+  <div class="drawer-item" id="nav-clock" onclick="navigateTo('clock')">Rest Timer</div>
   <div class="drawer-item" style="margin-top:auto;color:#ff3b30" onclick="logoutUser()">Sign Out</div>
 </nav>
 
@@ -1008,11 +980,13 @@
   let movementSearch = '';
 
   // ── Timer state ───────────────────────────────────────────────────────────
-  let clockMode     = 'rest';
-  let timerPreset   = 90;
-  let timerSeconds  = 90;
-  let timerRunning  = false;
-  let timerInterval = null;
+  let audioCtx        = null;
+  let timerPreset     = 90;
+  let timerSeconds    = 90;   // remaining seconds (updated on pause)
+  let timerStartedAt  = null; // Date.now() when last started/resumed
+  let timerStartSecs  = 90;   // timerSeconds value at last start/resume
+  let timerRunning    = false;
+  let timerInterval   = null;
 
   // ── Storage ───────────────────────────────────────────────────────────────
 
@@ -1174,7 +1148,7 @@
       document.getElementById('page-title').textContent = selectedMovement || 'Movement';
       renderMovementDetail();
     } else if (view === 'clock') {
-      document.getElementById('page-title').textContent = 'Clock';
+      document.getElementById('page-title').textContent = 'Rest Timer';
       renderClock();
     } else {
       document.getElementById('page-title').textContent = 'Workout Tracker';
@@ -1642,111 +1616,92 @@ const rows = loadAll();
     return m + ':' + String(sec).padStart(2, '0');
   }
 
-  function clockModeBar() {
-    const modes = [
-      { id: 'rest',   label: 'Rest'   },
-      { id: 'timer',  label: 'Timer'  },
-      { id: 'emom',   label: 'EMOM'   },
-      { id: 'amrap',  label: 'AMRAP'  },
-      { id: 'tabata', label: 'Tabata' },
-    ];
-    return `<div class="clock-mode-bar">
-      ${modes.map(m => `<button class="clock-mode-btn${clockMode === m.id ? ' active' : ''}" onclick="setClockMode('${m.id}')">${m.label}</button>`).join('')}
-    </div>`;
-  }
-
   function renderClock() {
     const el = document.getElementById('view-clock');
-    let content;
-    if (clockMode === 'rest') {
-      content = `
-        <div class="clock-display${timerRunning ? ' running' : timerSeconds === 0 ? ' done' : ''}" id="clock-display">
-          ${fmtTimer(timerSeconds)}
-        </div>
-        <div class="clock-presets">
-          <button class="preset-btn${timerPreset === 60  ? ' active' : ''}" onclick="setTimerPreset(60)">1:00</button>
-          <button class="preset-btn${timerPreset === 90  ? ' active' : ''}" onclick="setTimerPreset(90)">1:30</button>
-          <button class="preset-btn${timerPreset === 120 ? ' active' : ''}" onclick="setTimerPreset(120)">2:00</button>
-          <button class="preset-btn${timerPreset === 150 ? ' active' : ''}" onclick="setTimerPreset(150)">2:30</button>
-          <button class="preset-btn${timerPreset === 180 ? ' active' : ''}" onclick="setTimerPreset(180)">3:00</button>
-        </div>
-        <div class="clock-custom">
-          <span>Custom</span>
-          <input type="text" inputmode="numeric" placeholder="M:SS" maxlength="5"
-            id="clock-custom-input"
-            onblur="applyCustomTimer(this.value)"
-            onkeydown="if(event.key==='Enter'){this.blur();}">
-        </div>
-        <div class="clock-controls">
-          <button class="btn btn-primary clock-start-btn" id="clock-start-btn" onclick="toggleTimer()">
-            ${timerRunning ? 'Pause' : timerSeconds === 0 ? 'Restart' : 'Start'}
-          </button>
-          <button class="btn btn-secondary" onclick="resetTimer()">Reset</button>
-        </div>`;
-    } else {
-      const labels = { timer: 'Timer', emom: 'EMOM', amrap: 'AMRAP', tabata: 'Tabata' };
-      content = `<div style="color:#8e8e93;font-size:1rem;margin-top:40px;text-align:center">${labels[clockMode]} — coming soon</div>`;
-    }
-
-    el.innerHTML = `<div class="clock-view">${clockModeBar()}${content}</div>`;
-  }
-
-  function setClockMode(mode) {
-    clearInterval(timerInterval);
-    timerInterval = null;
-    timerRunning  = false;
-    clockMode = mode;
-    renderClock();
+    const dispClass = 'clock-display' + (timerRunning ? ' running' : timerSeconds === 0 ? ' done' : '');
+    el.innerHTML = `<div class="clock-view">
+      <div class="${dispClass}" id="clock-display">${fmtTimer(timerSeconds)}</div>
+      <div class="clock-presets">
+        <button class="preset-btn${timerPreset === 60  ? ' active' : ''}" onclick="setTimerPreset(60)">1:00</button>
+        <button class="preset-btn${timerPreset === 90  ? ' active' : ''}" onclick="setTimerPreset(90)">1:30</button>
+        <button class="preset-btn${timerPreset === 120 ? ' active' : ''}" onclick="setTimerPreset(120)">2:00</button>
+        <button class="preset-btn${timerPreset === 150 ? ' active' : ''}" onclick="setTimerPreset(150)">2:30</button>
+        <button class="preset-btn${timerPreset === 180 ? ' active' : ''}" onclick="setTimerPreset(180)">3:00</button>
+      </div>
+      <div class="clock-custom">
+        <span>Custom</span>
+        <input type="text" inputmode="numeric" placeholder="M:SS" maxlength="5"
+          id="clock-custom-input"
+          onblur="applyCustomTimer(this.value)"
+          onkeydown="if(event.key==='Enter'){this.blur();}">
+      </div>
+      <div class="clock-controls">
+        <button class="btn btn-primary clock-start-btn" id="clock-start-btn" onclick="toggleTimer()">
+          ${timerRunning ? 'Pause' : timerSeconds === 0 ? 'Restart' : 'Start'}
+        </button>
+        <button class="btn btn-secondary" onclick="resetTimer()">Reset</button>
+      </div>
+    </div>`;
   }
 
   function setTimerPreset(seconds) {
     clearInterval(timerInterval);
-    timerInterval = null;
-    timerRunning  = false;
-    timerPreset   = seconds;
-    timerSeconds  = seconds;
+    timerInterval  = null;
+    timerRunning   = false;
+    timerPreset    = seconds;
+    timerSeconds   = seconds;
+    timerStartedAt = null;
     renderClock();
   }
 
   function toggleTimer() {
-    if (timerSeconds === 0) {
-      timerSeconds = timerPreset;
-      timerRunning = false;
-    }
+    if (timerSeconds === 0) timerSeconds = timerPreset;
     if (timerRunning) {
+      // Pause: snapshot actual remaining time from wall clock
+      const elapsed = Math.floor((Date.now() - timerStartedAt) / 1000);
+      timerSeconds  = Math.max(0, timerStartSecs - elapsed);
       clearInterval(timerInterval);
-      timerInterval = null;
-      timerRunning  = false;
+      timerInterval  = null;
+      timerRunning   = false;
+      timerStartedAt = null;
       renderClock();
     } else {
-      timerRunning = true;
+      // Start / Resume
+      initAudioCtx();
+      timerStartedAt = Date.now();
+      timerStartSecs = timerSeconds;
+      timerRunning   = true;
       renderClock();
-      timerInterval = setInterval(() => {
-        timerSeconds--;
-        const display = document.getElementById('clock-display');
+      timerInterval  = setInterval(() => {
+        const elapsed    = Math.floor((Date.now() - timerStartedAt) / 1000);
+        const remaining  = Math.max(0, timerStartSecs - elapsed);
+        const display    = document.getElementById('clock-display');
         if (!display) { clearInterval(timerInterval); timerRunning = false; return; }
-        if (timerSeconds <= 0) {
-          timerSeconds = 0;
-          timerRunning = false;
+        if (remaining <= 0) {
+          timerSeconds   = 0;
+          timerRunning   = false;
+          timerStartedAt = null;
           clearInterval(timerInterval);
-          timerInterval = null;
+          timerInterval  = null;
           display.textContent = fmtTimer(0);
-          display.className = 'clock-display done';
+          display.className   = 'clock-display done';
           document.getElementById('clock-start-btn').textContent = 'Restart';
           playBeep();
           if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
         } else {
-          display.textContent = fmtTimer(timerSeconds);
+          timerSeconds = remaining;
+          display.textContent = fmtTimer(remaining);
         }
-      }, 1000);
+      }, 250); // Poll 4×/sec so display stays in sync after backgrounding
     }
   }
 
   function resetTimer() {
     clearInterval(timerInterval);
-    timerInterval = null;
-    timerRunning  = false;
-    timerSeconds  = timerPreset;
+    timerInterval  = null;
+    timerRunning   = false;
+    timerSeconds   = timerPreset;
+    timerStartedAt = null;
     renderClock();
   }
 
@@ -1763,19 +1718,54 @@ const rows = loadAll();
     if (seconds > 0) setTimerPreset(seconds);
   }
 
-  function playBeep() {
+  // When returning from background, recalculate remaining time from wall clock
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden || !timerRunning) return;
+    const elapsed   = Math.floor((Date.now() - timerStartedAt) / 1000);
+    const remaining = Math.max(0, timerStartSecs - elapsed);
+    if (remaining <= 0) {
+      timerSeconds   = 0;
+      timerRunning   = false;
+      timerStartedAt = null;
+      clearInterval(timerInterval);
+      timerInterval  = null;
+      if (currentView === 'clock') renderClock();
+      playBeep();
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+    } else {
+      timerSeconds = remaining;
+      if (currentView === 'clock') {
+        const display = document.getElementById('clock-display');
+        if (display) display.textContent = fmtTimer(remaining);
+      }
+    }
+  });
+
+  function initAudioCtx() {
     try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      [0, 0.25, 0.5].forEach(offset => {
-        const osc  = ctx.createOscillator();
-        const gain = ctx.createGain();
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+    } catch(e) {}
+  }
+
+  function playBeep(type) {
+    // type: 'go' (single tone) or default 'done' (3 tones)
+    try {
+      initAudioCtx();
+      if (!audioCtx) return;
+      const now   = audioCtx.currentTime;
+      const tones = type === 'go' ? [{ t: 0, freq: 660 }]
+                                  : [{ t: 0, freq: 880 }, { t: 0.25, freq: 880 }, { t: 0.5, freq: 880 }];
+      tones.forEach(({ t, freq }) => {
+        const osc  = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
         osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.frequency.value = 880;
-        gain.gain.setValueAtTime(0.4, ctx.currentTime + offset);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + offset + 0.2);
-        osc.start(ctx.currentTime + offset);
-        osc.stop(ctx.currentTime + offset + 0.2);
+        gain.connect(audioCtx.destination);
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.4, now + t);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + t + 0.2);
+        osc.start(now + t);
+        osc.stop(now + t + 0.25);
       });
     } catch(e) {}
   }

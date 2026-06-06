@@ -53,6 +53,14 @@ superset, exercise2, sets2, reps2, weight2, tempo2, comment2
 - Hosted on GitHub Pages at **https://ottyem.github.io/workout-tracker**
 - After committing, run `git push` to publish. GitHub Pages rebuilds in ~60 seconds.
 
+## Clock page — timer sound rules
+- Every timer mode must play a sound at **GO!** (when the 10s countdown ends and the
+  workout starts) and at the **end** of the timer (when it reaches zero or target).
+- Use `playBeep('go')` for GO! (single tone) and `playBeep()` for the end (3 tones).
+- iOS Safari blocks `AudioContext` in async callbacks. Always call `initAudioCtx()`
+  during the user-gesture (button tap) that starts the timer, so audio is unlocked
+  before the interval fires.
+
 ## How I like to work
 - I'm rusty at coding, so explain changes briefly and avoid unexplained jargon.
 - Make one change at a time so I can check each result.

@@ -18,10 +18,17 @@
 - ~~Move data to an online database so the same data is available on both
   laptop and phone.~~
 
-## Phase 4 — Advanced / AI / long term
-- Auto-parse a photo of my week's workouts and file each entry into the
-  correct day.
-- Upload videos when entering an exercise (long term).
+## Phase 4 — Rest Timer
+- ~~Add a "Rest Timer" page in the navigation drawer (third section after Workout and Movement List).~~
+- ~~Rest timer with wall-clock timestamps so it stays accurate when backgrounded; beeps on completion.~~
+- Four additional timer modes (not yet built — removed due to iOS background restrictions):
+  - **Rest timer** — preset durations (60s / 90s / 120s), counts down, beep/vibrate on zero.
+  - **EMOM** (Every Minute On the Minute) — set total minutes; counts down each 60s interval,
+    beeps at the start of each new minute.
+  - **For Time** — count-up stopwatch; tap stop when the workout is done.
+  - **AMRAP** (As Many Rounds As Possible) — set a total duration; counts down to zero.
+  - **Tabata** — configurable work/rest intervals (default 20s work / 10s rest) and number of
+    rounds; beeps on each transition.
 
 ## Done
 - v1: log entries (date, exercise, sets, reps, weight), view history,
