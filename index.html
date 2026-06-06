@@ -414,6 +414,34 @@
       min-height: 56px;
       border-radius: 14px;
     }
+    .clock-mode-bar {
+      display: flex;
+      background: #e5e5ea;
+      border-radius: 10px;
+      padding: 2px;
+      gap: 2px;
+      width: 100%;
+      margin-bottom: 8px;
+    }
+    .clock-mode-btn {
+      flex: 1;
+      padding: 7px 2px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #3a3a3c;
+      cursor: pointer;
+      min-height: 36px;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.15s, color 0.15s;
+    }
+    .clock-mode-btn.active {
+      background: white;
+      color: #007aff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+    }
 
     /* ── Toolbar ── */
     .toolbar {
@@ -980,6 +1008,7 @@
   let movementSearch = '';
 
   // ── Timer state ───────────────────────────────────────────────────────────
+  let clockMode     = 'rest';
   let timerPreset   = 90;
   let timerSeconds  = 90;
   let timerRunning  = false;
@@ -1613,10 +1642,24 @@ const rows = loadAll();
     return m + ':' + String(sec).padStart(2, '0');
   }
 
+  function clockModeBar() {
+    const modes = [
+      { id: 'rest',   label: 'Rest'   },
+      { id: 'timer',  label: 'Timer'  },
+      { id: 'emom',   label: 'EMOM'   },
+      { id: 'amrap',  label: 'AMRAP'  },
+      { id: 'tabata', label: 'Tabata' },
+    ];
+    return `<div class="clock-mode-bar">
+      ${modes.map(m => `<button class="clock-mode-btn${clockMode === m.id ? ' active' : ''}" onclick="setClockMode('${m.id}')">${m.label}</button>`).join('')}
+    </div>`;
+  }
+
   function renderClock() {
     const el = document.getElementById('view-clock');
-    el.innerHTML = `
-      <div class="clock-view">
+    let content;
+    if (clockMode === 'rest') {
+      content = `
         <div class="clock-display${timerRunning ? ' running' : timerSeconds === 0 ? ' done' : ''}" id="clock-display">
           ${fmtTimer(timerSeconds)}
         </div>
@@ -1639,8 +1682,21 @@ const rows = loadAll();
             ${timerRunning ? 'Pause' : timerSeconds === 0 ? 'Restart' : 'Start'}
           </button>
           <button class="btn btn-secondary" onclick="resetTimer()">Reset</button>
-        </div>
-      </div>`;
+        </div>`;
+    } else {
+      const labels = { timer: 'Timer', emom: 'EMOM', amrap: 'AMRAP', tabata: 'Tabata' };
+      content = `<div style="color:#8e8e93;font-size:1rem;margin-top:40px;text-align:center">${labels[clockMode]} — coming soon</div>`;
+    }
+
+    el.innerHTML = `<div class="clock-view">${clockModeBar()}${content}</div>`;
+  }
+
+  function setClockMode(mode) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+    timerRunning  = false;
+    clockMode = mode;
+    renderClock();
   }
 
   function setTimerPreset(seconds) {
