@@ -398,6 +398,19 @@
       background: white;
       color: #1c1c1e;
     }
+    .comma-btn {
+      margin-top: 5px;
+      padding: 4px 14px;
+      border: 1.5px solid #007aff;
+      border-radius: 14px;
+      background: transparent;
+      color: #007aff;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
     .clock-custom input:focus {
       outline: none;
       border-color: #007aff;
@@ -836,7 +849,12 @@
     </div>
     <div class="field">
       <label for="inp-reps">Reps</label>
-      <input type="number" id="inp-reps" min="1" placeholder="10">
+      <input type="text" inputmode="numeric" id="inp-reps" placeholder="10 or 10,8,9,8"
+        oninput="autoCountSets(this,'inp-sets')">
+      <div style="display:flex;gap:6px;margin-top:5px">
+        <button type="button" class="comma-btn" onclick="insertRepsText('inp-reps','inp-sets',',')">,</button>
+        <button type="button" class="comma-btn" onclick="insertRepsText('inp-reps','inp-sets','sec')">sec</button>
+      </div>
     </div>
     <div class="field">
       <label for="inp-weight">Weight</label>
@@ -903,7 +921,12 @@
       </div>
       <div class="field">
         <label for="inp-reps2">Reps</label>
-        <input type="number" id="inp-reps2" min="1" placeholder="10">
+        <input type="text" inputmode="numeric" id="inp-reps2" placeholder="10 or 10,8,9,8"
+          oninput="autoCountSets(this,'inp-sets2')">
+        <div style="display:flex;gap:6px;margin-top:5px">
+          <button type="button" class="comma-btn" onclick="insertRepsText('inp-reps2','inp-sets2',',')">,</button>
+          <button type="button" class="comma-btn" onclick="insertRepsText('inp-reps2','inp-sets2','sec')">sec</button>
+        </div>
       </div>
       <div class="field">
         <label for="inp-weight2">Weight</label>
@@ -1024,12 +1047,37 @@
   }
 
   function statsLine(s, rp, w, t, unit) {
+    const rpStr  = String(rp || '');
+    const perSet = rpStr.includes(',');
+    const hasSec = rpStr.includes('sec');
+    const parts  = perSet ? rpStr.split(',').map(v => v.trim()) : [rpStr];
+    const repStr = rp
+      ? parts.join(' / ') + (hasSec ? '' : ' reps')
+      : '';
     return [
-      s  ? s  + ' sets'              : '',
-      rp ? rp + ' reps'              : '',
-      w  ? w  + ' ' + (unit || 'lbs') : '',
-      t  ? t  + ' tempo'             : '',
+      (!perSet && s) ? s + ' sets' : '',
+      repStr,
+      w ? w + ' ' + (unit || 'lbs') : '',
+      t ? t + ' tempo' : '',
     ].filter(Boolean).join(' · ');
+  }
+
+  function insertRepsText(inputId, setsId, text) {
+    const input = document.getElementById(inputId);
+    const start = input.selectionStart;
+    const end   = input.selectionEnd;
+    input.value = input.value.slice(0, start) + text + input.value.slice(end);
+    input.setSelectionRange(start + text.length, start + text.length);
+    input.focus();
+    autoCountSets(input, setsId);
+  }
+
+  function autoCountSets(repsInput, setsId) {
+    const val = repsInput.value.trim();
+    if (val.includes(',')) {
+      const count = val.split(',').filter(v => v.trim()).length;
+      document.getElementById(setsId).value = count;
+    }
   }
 
   function entryHTML(r) {
@@ -1228,8 +1276,9 @@
       rows.forEach(r => {
         const isA = r.exercise === name;
         const w   = parseFloat(isA ? r.weight : r.weight2) || 0;
-        const rp  = parseInt(  isA ? r.reps   : r.reps2)   || 0;
-        if (rp === rep && w > best) best = w;
+        const repsStr  = String(isA ? r.reps : r.reps2 || '');
+        const repCounts = repsStr.split(',').map(v => parseInt(v.trim()) || 0);
+        if (repCounts.includes(rep) && w > best) best = w;
       });
       if (best) result[rep] = best;
     });
