@@ -1866,7 +1866,7 @@ const rows = loadAll();
   <h1>Workout Tracker</h1>
   <p class="sub">${fmtDate(date)}</p>
   ${entries}
-  <script>window.print();<\/script>
+  <script>window.onafterprint = () => window.close(); window.print();<\/script>
 </body>
 </html>`;
 
