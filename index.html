@@ -1475,6 +1475,7 @@
       <div class="cal-detail-header">
         <span>${fmtDate(selectedCalDate)}</span>
         <button class="btn btn-secondary btn-sm" onclick="shareDay('${selectedCalDate}')">Share</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteDay('${selectedCalDate}')">Delete day</button>
       </div>
       <div class="day-entries">${rows.map(entryHTML).join('')}</div>`;
   }
@@ -1654,6 +1655,16 @@ const rows = loadAll();
     const rows = loadAll().filter(r => r.id !== id);
     localStorage.setItem(KEY, JSON.stringify(rows));
     if (sb && currentUser) sb.from('workouts').delete().eq('id', id);
+    renderCalendar();
+  }
+
+  function deleteDay(date) {
+    if (!confirm(`Delete all entries for ${fmtDate(date)}?`)) return;
+    const toDelete = loadAll().filter(r => r.date === date).map(r => r.id);
+    const rows = loadAll().filter(r => r.date !== date);
+    localStorage.setItem(KEY, JSON.stringify(rows));
+    if (sb && currentUser) sb.from('workouts').delete().in('id', toDelete);
+    selectedCalDate = null;
     renderCalendar();
   }
 
