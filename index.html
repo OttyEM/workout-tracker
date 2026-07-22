@@ -1654,7 +1654,10 @@ const rows = loadAll();
     if (!confirm('Delete this entry?')) return;
     const rows = loadAll().filter(r => r.id !== id);
     localStorage.setItem(KEY, JSON.stringify(rows));
-    if (sb && currentUser) sb.from('workouts').delete().eq('id', id);
+    if (sb && currentUser) {
+      sb.from('workouts').delete().eq('id', id)
+        .then(({ error }) => { if (error) { console.error('Delete error:', error); alert('Cloud sync failed — entry deleted locally but may reappear on refresh. Check console for details.'); } });
+    }
     renderCalendar();
   }
 
@@ -1663,7 +1666,10 @@ const rows = loadAll();
     const toDelete = loadAll().filter(r => r.date === date).map(r => r.id);
     const rows = loadAll().filter(r => r.date !== date);
     localStorage.setItem(KEY, JSON.stringify(rows));
-    if (sb && currentUser) sb.from('workouts').delete().in('id', toDelete);
+    if (sb && currentUser) {
+      sb.from('workouts').delete().in('id', toDelete)
+        .then(({ error }) => { if (error) { console.error('Delete day error:', error); alert('Cloud sync failed — entries deleted locally but may reappear on refresh. Check console for details.'); } });
+    }
     selectedCalDate = null;
     renderCalendar();
   }
