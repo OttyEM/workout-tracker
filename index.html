@@ -398,6 +398,31 @@
       background: white;
       color: #1c1c1e;
     }
+    .varsets-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      border-top: 1px solid #f2f2f7;
+    }
+    .varsets-label {
+      font-size: 0.82rem;
+      color: #8e8e93;
+      font-weight: 600;
+      min-width: 40px;
+    }
+    .varsets-row input {
+      flex: 1;
+      padding: 8px 10px;
+      border: 1.5px solid #e5e5ea;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      background: white;
+      color: #1c1c1e;
+      min-width: 0;
+    }
+    .varsets-row input:focus { outline: none; border-color: #007aff; }
+
     .comma-btn {
       margin-top: 5px;
       padding: 4px 14px;
@@ -842,24 +867,44 @@
     </div>
   </div>
 
-  <div class="row">
-    <div class="field">
-      <label for="inp-sets">Sets</label>
-      <input type="number" id="inp-sets" min="1" placeholder="3">
-    </div>
-    <div class="field">
-      <label for="inp-reps">Reps</label>
-      <input type="text" inputmode="numeric" id="inp-reps" placeholder="10 or 10,8,9,8"
-        oninput="autoCountSets(this,'inp-sets')">
-      <div style="display:flex;gap:6px;margin-top:5px">
-        <button type="button" class="comma-btn" onclick="insertRepsText('inp-reps','inp-sets',',')">,</button>
-        <button type="button" class="comma-btn" onclick="insertRepsText('inp-reps','inp-sets','sec')">sec</button>
+  <div class="toggle-row" style="margin-top:4px">
+    <label class="toggle">
+      <input type="checkbox" id="varsets-toggle" onchange="onVarSetsToggle()">
+      <span class="toggle-track"></span>
+    </label>
+    <span class="toggle-label" onclick="document.getElementById('varsets-toggle').click()">Variable sets</span>
+  </div>
+
+  <!-- Normal sets/reps/weight (varsets OFF) -->
+  <div id="normal-sets-row">
+    <div class="row">
+      <div class="field">
+        <label for="inp-sets">Sets</label>
+        <input type="number" id="inp-sets" min="1" placeholder="3">
+      </div>
+      <div class="field">
+        <label for="inp-reps">Reps</label>
+        <input type="text" inputmode="numeric" id="inp-reps" placeholder="10 or 10,8,9,8"
+          oninput="autoCountSets(this,'inp-sets')">
+        <div style="display:flex;gap:6px;margin-top:5px">
+          <button type="button" class="comma-btn" onclick="insertRepsText('inp-reps','inp-sets',',')">,</button>
+          <button type="button" class="comma-btn" onclick="insertRepsText('inp-reps','inp-sets','sec')">sec</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="inp-weight">Weight</label>
+        <input type="number" id="inp-weight" min="0" step="0.5" placeholder="135">
       </div>
     </div>
-    <div class="field">
-      <label for="inp-weight">Weight</label>
-      <input type="number" id="inp-weight" min="0" step="0.5" placeholder="135">
+  </div>
+
+  <!-- Variable sets section (varsets ON) -->
+  <div id="varsets-section" style="display:none">
+    <div class="field" style="max-width:100px">
+      <label for="varsets-count">Sets</label>
+      <input type="number" id="varsets-count" min="1" placeholder="3" oninput="renderVarSetsRows()">
     </div>
+    <div id="varsets-rows"></div>
   </div>
 
   <div class="field">
@@ -1001,6 +1046,7 @@
   let currentView = 'calendar';
   let selectedMovement = null;
   let movementSearch = '';
+  let variableSetsActive = false;
 
   // ── Timer state ───────────────────────────────────────────────────────────
   let audioCtx        = null;
@@ -1080,6 +1126,16 @@
     }
   }
 
+  function varSetsLine(sets, reps, weight, unit) {
+    const repsArr   = String(reps   || '').split(',');
+    const weightArr = String(weight || '').split(',');
+    return repsArr.map((rp, i) => {
+      const w = weightArr[i] || '';
+      const parts = [rp.trim() ? rp.trim() + ' reps' : '', w ? w + ' ' + (unit || 'lbs') : ''];
+      return 'Set ' + (i + 1) + ': ' + parts.filter(Boolean).join(' · ');
+    }).join('<br>');
+  }
+
   function entryHTML(r) {
     const nameHTML = r.superset && r.exercise2
       ? `${esc(r.exercise)} <span class="superset-plus">+</span> ${esc(r.exercise2)}`
@@ -1088,7 +1144,10 @@
     let statsHTML;
     const unit  = r.unit  || 'lbs';
     const unit2 = r.unit2 || r.unit || 'lbs';
-    if (r.superset && r.exercise2) {
+    if (r.variablesets) {
+      statsHTML = `<div class="entry-meta">${varSetsLine(r.sets, r.reps, r.weight, unit)}</div>
+        ${r.comment ? `<div class="entry-comment">${esc(r.comment)}</div>` : ''}`;
+    } else if (r.superset && r.exercise2) {
       const sA = statsLine(r.sets,  r.reps,  r.weight,  r.tempo,  unit);
       const sB = statsLine(r.sets2, r.reps2, r.weight2, r.tempo2, unit2);
       statsHTML = `
@@ -1275,10 +1334,22 @@
       let best = 0;
       rows.forEach(r => {
         const isA = r.exercise === name;
-        const w   = parseFloat(isA ? r.weight : r.weight2) || 0;
-        const repsStr  = String(isA ? r.reps : r.reps2 || '');
-        const repCounts = repsStr.split(',').map(v => parseInt(v.trim()) || 0);
-        if (repCounts.includes(rep) && w > best) best = w;
+        if (r.variablesets && isA) {
+          // Each set has its own reps and weight
+          const repsArr   = String(r.reps   || '').split(',');
+          const weightArr = String(r.weight || '').split(',');
+          repsArr.forEach((rp, i) => {
+            if ((parseInt(rp.trim()) || 0) === rep) {
+              const w = parseFloat(weightArr[i]) || 0;
+              if (w > best) best = w;
+            }
+          });
+        } else {
+          const w        = parseFloat(isA ? r.weight : r.weight2) || 0;
+          const repsStr  = String(isA ? r.reps : r.reps2 || '');
+          const repCounts = repsStr.split(',').map(v => parseInt(v.trim()) || 0);
+          if (repCounts.includes(rep) && w > best) best = w;
+        }
       });
       if (best) result[rep] = best;
     });
@@ -1351,9 +1422,11 @@
       const unit  = r.unit  || 'lbs';
       const unit2 = r.unit2 || r.unit || 'lbs';
       const isA   = r.exercise === name;
-      const s     = isA
-        ? statsLine(r.sets,  r.reps,  r.weight,  r.tempo,  unit)
-        : statsLine(r.sets2, r.reps2, r.weight2, r.tempo2, unit2);
+      const s     = (r.variablesets && isA)
+        ? varSetsLine(r.sets, r.reps, r.weight, unit)
+        : (isA
+          ? statsLine(r.sets,  r.reps,  r.weight,  r.tempo,  unit)
+          : statsLine(r.sets2, r.reps2, r.weight2, r.tempo2, unit2));
       const comment = isA ? r.comment : r.comment2;
       const partner = r.superset && r.exercise2
         ? (isA ? r.exercise2 : r.exercise)
@@ -1534,6 +1607,49 @@
     clearTempoStr('2');
   }
 
+  // ── Variable sets ────────────────────────────────────────────────────────
+
+  function onVarSetsToggle() {
+    variableSetsActive = document.getElementById('varsets-toggle').checked;
+    document.getElementById('normal-sets-row').style.display  = variableSetsActive ? 'none' : '';
+    document.getElementById('varsets-section').style.display  = variableSetsActive ? '' : 'none';
+    if (variableSetsActive) {
+      // Copy sets count over if already entered
+      const existing = document.getElementById('inp-sets').value;
+      if (existing) document.getElementById('varsets-count').value = existing;
+      renderVarSetsRows();
+    }
+  }
+
+  function renderVarSetsRows() {
+    const count = parseInt(document.getElementById('varsets-count').value) || 0;
+    const container = document.getElementById('varsets-rows');
+    // Preserve already-typed values
+    const existing = [...container.querySelectorAll('.varsets-row')].map(row => ({
+      reps:   row.querySelector('.varsets-reps').value,
+      weight: row.querySelector('.varsets-weight').value,
+    }));
+    if (!count) { container.innerHTML = ''; return; }
+    const unit = currentUnit;
+    container.innerHTML = Array.from({ length: count }, (_, i) => `
+      <div class="varsets-row">
+        <span class="varsets-label">Set ${i + 1}</span>
+        <input type="text" inputmode="numeric" class="varsets-reps" placeholder="Reps"
+          value="${esc(existing[i]?.reps || '')}">
+        <input type="number" step="0.5" class="varsets-weight" placeholder="${unit === 'kg' ? 'kg' : 'lbs'}"
+          value="${existing[i]?.weight || ''}">
+      </div>`).join('');
+  }
+
+  function getVarSetsData() {
+    const rows = [...document.querySelectorAll('#varsets-rows .varsets-row')];
+    return {
+      sets:   String(rows.length),
+      reps:   rows.map(r => r.querySelector('.varsets-reps').value.trim()).join(','),
+      weight: rows.map(r => r.querySelector('.varsets-weight').value.trim()).join(','),
+    };
+  }
+
   // ── Save ──────────────────────────────────────────────────────────────────
 
   function saveEntry() {
@@ -1565,7 +1681,12 @@
 const rows = loadAll();
     const unit  = currentUnit;
     const unit2 = currentUnit2;
-    const entry = { date, exercise, sets, reps, weight, tempo, comment, unit, superset, exercise2, sets2, reps2, weight2, tempo2, comment2, unit2 };
+    const variablesets = variableSetsActive;
+    const vsData = variablesets ? getVarSetsData() : { sets, reps, weight };
+    const entry = { date, exercise,
+      sets: vsData.sets, reps: vsData.reps, weight: vsData.weight,
+      tempo, comment, unit, variablesets,
+      superset, exercise2, sets2, reps2, weight2, tempo2, comment2, unit2 };
 
     if (editingId) {
       const i = rows.findIndex(r => r.id === editingId);
@@ -1588,9 +1709,27 @@ const rows = loadAll();
     editingId = id;
     document.getElementById('inp-date').value     = row.date;
     document.getElementById('inp-exercise').value = row.exercise;
-    document.getElementById('inp-sets').value     = row.sets;
-    document.getElementById('inp-reps').value     = row.reps;
-    document.getElementById('inp-weight').value   = row.weight;
+
+    // Restore variable sets state
+    variableSetsActive = !!row.variablesets;
+    document.getElementById('varsets-toggle').checked             = variableSetsActive;
+    document.getElementById('normal-sets-row').style.display     = variableSetsActive ? 'none' : '';
+    document.getElementById('varsets-section').style.display     = variableSetsActive ? '' : 'none';
+    if (variableSetsActive) {
+      document.getElementById('varsets-count').value = row.sets || '';
+      renderVarSetsRows();
+      // Fill per-set values
+      const repsArr   = (row.reps   || '').split(',');
+      const weightArr = (row.weight || '').split(',');
+      document.querySelectorAll('#varsets-rows .varsets-row').forEach((r, i) => {
+        r.querySelector('.varsets-reps').value   = repsArr[i]   || '';
+        r.querySelector('.varsets-weight').value = weightArr[i] || '';
+      });
+    } else {
+      document.getElementById('inp-sets').value   = row.sets;
+      document.getElementById('inp-reps').value   = row.reps;
+      document.getElementById('inp-weight').value = row.weight;
+    }
 
     setUnit(row.unit   || 'lbs');
     setUnit2(row.unit2 || 'lbs');
@@ -1638,6 +1777,12 @@ const rows = loadAll();
     document.getElementById('tempo-field').style.display = 'none';
     clearTempoStr('');
     document.getElementById('inp-comment').value          = '';
+    variableSetsActive = false;
+    document.getElementById('varsets-toggle').checked         = false;
+    document.getElementById('normal-sets-row').style.display = '';
+    document.getElementById('varsets-section').style.display = 'none';
+    document.getElementById('varsets-count').value           = '';
+    document.getElementById('varsets-rows').innerHTML        = '';
     document.getElementById('superset-toggle').checked          = false;
     document.getElementById('superset-section').style.display  = 'none';
     document.getElementById('lbl-exercise').textContent         = 'Exercise';
