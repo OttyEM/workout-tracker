@@ -991,9 +991,15 @@
 
 </div><!-- end view-form -->
 
-<!-- Hidden date picker for Move Day -->
-<input type="date" id="move-day-picker" style="position:fixed;opacity:0;pointer-events:none;top:0;left:0;"
-  onchange="confirmMoveDay(this.value)">
+<!-- Move Day modal -->
+<div id="move-day-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:500;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:white;border-radius:14px;padding:24px;width:100%;max-width:320px;box-shadow:0 4px 20px rgba(0,0,0,0.15);">
+    <div style="font-weight:700;font-size:1rem;margin-bottom:16px">Move to…</div>
+    <input type="date" id="move-day-picker" style="width:100%;padding:10px 12px;border:1.5px solid #e5e5ea;border-radius:10px;font-size:1rem;color:#1c1c1e;background:white;margin-bottom:16px;">
+    <button class="btn btn-primary" onclick="confirmMoveDay()">Move</button>
+    <button class="btn btn-outline" onclick="document.getElementById('move-day-modal').style.display='none'">Cancel</button>
+  </div>
+</div>
 
 <div id="view-calendar">
   <div class="card">
@@ -1812,16 +1818,18 @@ const rows = loadAll();
   }
 
   function moveDay(date) {
+    const modal  = document.getElementById('move-day-modal');
     const picker = document.getElementById('move-day-picker');
     picker.value = date;
     picker._sourceDate = date;
-    picker.style.pointerEvents = 'auto';
-    picker.click();
-    picker.style.pointerEvents = 'none';
+    modal.style.display = 'flex';
   }
 
-  function confirmMoveDay(target) {
-    const date = document.getElementById('move-day-picker')._sourceDate;
+  function confirmMoveDay() {
+    const picker = document.getElementById('move-day-picker');
+    const target = picker.value;
+    const date   = picker._sourceDate;
+    document.getElementById('move-day-modal').style.display = 'none';
     if (!target || target === date) return;
     const rows = loadAll().map(r => r.date === date ? { ...r, date: target } : r);
     saveAll(rows);
