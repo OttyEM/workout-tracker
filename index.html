@@ -991,6 +991,10 @@
 
 </div><!-- end view-form -->
 
+<!-- Hidden date picker for Move Day -->
+<input type="date" id="move-day-picker" style="position:fixed;opacity:0;pointer-events:none;top:0;left:0;"
+  onchange="confirmMoveDay(this.value)">
+
 <div id="view-calendar">
   <div class="card">
     <div class="cal-nav">
@@ -1548,6 +1552,7 @@
       <div class="cal-detail-header">
         <span>${fmtDate(selectedCalDate)}</span>
         <button class="btn btn-secondary btn-sm" onclick="shareDay('${selectedCalDate}')">Share</button>
+        <button class="btn btn-secondary btn-sm" onclick="moveDay('${selectedCalDate}')">Move to…</button>
         <button class="btn btn-danger btn-sm" onclick="deleteDay('${selectedCalDate}')">Delete day</button>
       </div>
       <div class="day-entries">${rows.map(entryHTML).join('')}</div>`;
@@ -1803,6 +1808,24 @@ const rows = loadAll();
       sb.from('workouts').delete().eq('id', id)
         .then(({ error }) => { if (error) { console.error('Delete error:', error); alert('Cloud sync failed — entry deleted locally but may reappear on refresh. Check console for details.'); } });
     }
+    renderCalendar();
+  }
+
+  function moveDay(date) {
+    const picker = document.getElementById('move-day-picker');
+    picker.value = date;
+    picker._sourceDate = date;
+    picker.style.pointerEvents = 'auto';
+    picker.click();
+    picker.style.pointerEvents = 'none';
+  }
+
+  function confirmMoveDay(target) {
+    const date = document.getElementById('move-day-picker')._sourceDate;
+    if (!target || target === date) return;
+    const rows = loadAll().map(r => r.date === date ? { ...r, date: target } : r);
+    saveAll(rows);
+    selectedCalDate = target;
     renderCalendar();
   }
 
