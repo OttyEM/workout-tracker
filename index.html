@@ -1106,6 +1106,66 @@
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   }
 
+  // "bench press" → "Bench Press". Words typed in all capitals (RDL) are kept as-is.
+  // Letters after a dot or hyphen are capitalised too (W.Dips, T-Bar Row).
+  function formatMovementName(name) {
+    return String(name || '').trim().replace(/\s+/g, ' ').split(' ').map(w =>
+      (w.length > 1 && /[A-Z]/.test(w) && w === w.toUpperCase())
+        ? w
+        : w.toLowerCase().replace(/(^|[.\-\/(])([a-z])/g, (m, before, letter) => before + letter.toUpperCase())
+    ).join(' ');
+  }
+
+  // One spelling per movement, ignoring case. If several spellings exist,
+  // the most used one wins: { "bench press": "Bench Press", ... }
+  function movementSpellings(rows) {
+    const counts = {};
+    rows.forEach(r => ['exercise', 'exercise2'].forEach(k => {
+      if (!r[k]) return;
+      const name = formatMovementName(r[k]);
+      const key  = name.toLowerCase();
+      counts[key] = counts[key] || {};
+      counts[key][name] = (counts[key][name] || 0) + 1;
+    }));
+    const best = {};
+    Object.entries(counts).forEach(([key, names]) => {
+      best[key] = Object.entries(names).sort((a, b) => b[1] - a[1])[0][0];
+    });
+    return best;
+  }
+
+  // Formats a typed name, reusing the existing spelling if the movement is already known.
+  function movementName(name, spellings = movementSpellings(loadAll())) {
+    const formatted = formatMovementName(name);
+    return spellings[formatted.toLowerCase()] || formatted;
+  }
+
+  // Merges movement names saved with different cases, so they show once in the list.
+  // Only writes (and syncs) if something actually changed.
+  function fixSavedMovementNames() {
+    const rows = loadAll();
+    const spellings = movementSpellings(rows);
+    let changed = false;
+    rows.forEach(r => {
+      ['exercise', 'exercise2'].forEach(k => {
+        if (!r[k]) return;
+        const fixed = movementName(r[k], spellings);
+        if (fixed !== r[k]) { r[k] = fixed; changed = true; }
+      });
+    });
+    if (changed) saveAll(rows);
+
+    const rms = loadRMs();
+    const fixedRMs = {};
+    let rmsChanged = false;
+    Object.entries(rms).forEach(([name, reps]) => {
+      const fixed = movementName(name, spellings);
+      if (fixed !== name) rmsChanged = true;
+      fixedRMs[fixed] = { ...(fixedRMs[fixed] || {}), ...reps };
+    });
+    if (rmsChanged) saveRMs(fixedRMs);
+  }
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   function setUnit(unit) {
@@ -1687,14 +1747,14 @@
 
   function saveEntry() {
     const date      = document.getElementById('inp-date').value.trim();
-    const exercise  = document.getElementById('inp-exercise').value.trim();
+    const exercise  = movementName(document.getElementById('inp-exercise').value);
     const sets      = document.getElementById('inp-sets').value.trim();
     const reps      = document.getElementById('inp-reps').value.trim();
     const weight    = document.getElementById('inp-weight').value.trim();
     const tempo     = getTempoStr('');
     const comment   = document.getElementById('inp-comment').value.trim();
     const superset  = document.getElementById('superset-toggle').checked;
-    const exercise2 = superset ? document.getElementById('inp-exercise2').value.trim()  : '';
+    const exercise2 = superset ? movementName(document.getElementById('inp-exercise2').value) : '';
     const sets2     = superset ? document.getElementById('inp-sets2').value.trim()      : '';
     const reps2     = superset ? document.getElementById('inp-reps2').value.trim()      : '';
     const weight2   = superset ? document.getElementById('inp-weight2').value.trim()    : '';
@@ -2237,6 +2297,7 @@ const rows = loadAll();
       return;
     }
     const rows = loadAll();
+    const spellings = movementSpellings(rows);
     let count = 0;
     const importBase = Date.now();
     prog.days.forEach(day => {
@@ -2246,7 +2307,7 @@ const rows = loadAll();
         rows.push({
           id:        (importBase + count * 10).toString(36) + Math.random().toString(36).slice(2, 6),
           date:      day.date,
-          exercise:  ex.exercise,
+          exercise:  movementName(ex.exercise, spellings),
           sets:      ex.sets      || '',
           reps:      ex.reps      || '',
           weight:    '',
@@ -2254,7 +2315,7 @@ const rows = loadAll();
           comment:   ex.comment   || '',
           unit:      ex.unit      || 'lbs',
           superset:  !!ex.superset,
-          exercise2: ex.exercise2 || '',
+          exercise2: ex.exercise2 ? movementName(ex.exercise2, spellings) : '',
           sets2:     ex.sets2     || '',
           reps2:     ex.reps2     || '',
           weight2:   '',
@@ -2351,7 +2412,7 @@ const rows = loadAll();
       if (currentUser) {
         document.getElementById('auth-overlay').style.display = 'none';
         if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
-          pullFromSupabase().then(() => showMainView('calendar'));
+          pullFromSupabase().then(() => { fixSavedMovementNames(); showMainView('calendar'); });
         }
       } else {
         document.getElementById('auth-overlay').style.display = 'flex';
@@ -2360,6 +2421,7 @@ const rows = loadAll();
   } else {
     // Supabase not configured — run in local-only mode
     document.getElementById('auth-overlay').style.display = 'none';
+    fixSavedMovementNames();
     showMainView('calendar');
   }
 </script>
