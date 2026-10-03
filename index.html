@@ -1434,25 +1434,34 @@
     }
   }
 
+  // PRs are compared and stored in lbs; shown in whichever unit is picked.
+  const KG_TO_LBS = 2.20462;
+  const toLbs   = (w, unit) => unit === 'kg' ? w * KG_TO_LBS : w;
+  const fromLbs = (w, unit) => unit === 'kg' ? w / KG_TO_LBS : w;
+  const fmtWeight = w => String(Math.round(w * 10) / 10);
+  let rmUnit = null; // unit chosen with the PR toggle; null = unit of the latest session
+
+  // Best weight (in lbs) lifted for 1, 3, 5 and 10 reps
   function calcAutoRMs(name) {
     const rows = loadAll().filter(r => movementSide(r, name));
     const result = {};
     [1, 3, 5, 10].forEach(rep => {
       let best = 0;
       rows.forEach(r => {
-        const isA = movementSide(r, name) === 'A';
+        const isA  = movementSide(r, name) === 'A';
+        const unit = isA ? (r.unit || 'lbs') : (r.unit2 || r.unit || 'lbs');
         if (r.variablesets && isA) {
           // Each set has its own reps and weight
           const repsArr   = String(r.reps   || '').split(',');
           const weightArr = String(r.weight || '').split(',');
           repsArr.forEach((rp, i) => {
             if ((parseInt(rp.trim()) || 0) === rep) {
-              const w = parseFloat(weightArr[i]) || 0;
+              const w = toLbs(parseFloat(weightArr[i]) || 0, unit);
               if (w > best) best = w;
             }
           });
         } else {
-          const w        = parseFloat(isA ? r.weight : r.weight2) || 0;
+          const w        = toLbs(parseFloat(isA ? r.weight : r.weight2) || 0, unit);
           const repsStr  = String(isA ? r.reps : r.reps2 || '');
           const repCounts = repsStr.split(',').map(v => parseInt(v.trim()) || 0);
           if (repCounts.includes(rep) && w > best) best = w;
@@ -1467,10 +1476,12 @@
     const name    = selectedMovement;
     const auto    = calcAutoRMs(name);
     const manuals = loadRMs()[name] || {};
+    const unit    = rmDisplayUnit(name);
     const current = Math.max(auto[rep] || 0, manuals[rep] || 0);
-    const input   = prompt(`Set ${rep}RM for ${name} (clear to reset to auto):`, current || '');
+    const input   = prompt(`Set ${rep}RM for ${name} in ${unit} (clear to reset to auto):`,
+                           current ? fmtWeight(fromLbs(current, unit)) : '');
     if (input === null) return;
-    const val = parseFloat(input);
+    const val = toLbs(parseFloat(input), unit);
     const all = loadRMs();
     if (!all[name]) all[name] = {};
     if (!isNaN(val) && val > 0) {
@@ -1485,9 +1496,7 @@
   function rmSectionHTML(name) {
     const auto    = calcAutoRMs(name);
     const manuals = loadRMs()[name] || {};
-    const rows    = loadAll().filter(r => movementSide(r, name))
-                             .sort((a, b) => b.date.localeCompare(a.date));
-    const unit    = rows.length ? (rows[0].unit || 'lbs') : 'lbs';
+    const unit    = rmDisplayUnit(name);
 
     const cards = [1, 3, 5, 10].map(rep => {
       const autoVal   = auto[rep]    || 0;
@@ -1496,16 +1505,40 @@
       const isManual  = manualVal > autoVal;
       return `<div class="rm-card" onclick="editRM(${rep})">
         <div class="rm-label">${rep}RM</div>
-        <div class="rm-value ${isManual ? 'rm-manual' : ''}">${val || '—'}</div>
+        <div class="rm-value ${isManual ? 'rm-manual' : ''}">${val ? fmtWeight(fromLbs(val, unit)) : '—'}</div>
         ${val ? `<div class="rm-unit">${unit}</div>` : ''}
       </div>`;
     }).join('');
 
-    return `<div class="rm-grid">${cards}</div>`;
+    return `<div class="unit-row">
+        <span>PR unit</span>
+        <div class="unit-picker">
+          <button type="button" class="unit-btn ${unit === 'lbs' ? 'active' : ''}" onclick="setRMUnit('lbs')">lbs</button>
+          <button type="button" class="unit-btn ${unit === 'kg'  ? 'active' : ''}" onclick="setRMUnit('kg')">kg</button>
+        </div>
+      </div>
+      <div class="rm-grid">${cards}</div>`;
+  }
+
+  // Unit picked with the toggle, otherwise the unit of the latest session of this movement
+  function rmDisplayUnit(name) {
+    if (rmUnit) return rmUnit;
+    const latest = loadAll().filter(r => movementSide(r, name))
+      .sort((a, b) => b.date.localeCompare(a.date))[0];
+    if (!latest) return 'lbs';
+    return movementSide(latest, name) === 'A'
+      ? (latest.unit || 'lbs')
+      : (latest.unit2 || latest.unit || 'lbs');
+  }
+
+  function setRMUnit(unit) {
+    rmUnit = unit;
+    renderMovementDetail();
   }
 
   function navigateToMovement(name) {
     selectedMovement = name;
+    rmUnit = null;
     showMainView('movement-detail');
     window.scrollTo({ top: 0, behavior: 'instant' });
   }
