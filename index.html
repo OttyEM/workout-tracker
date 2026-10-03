@@ -1112,6 +1112,8 @@
     currentUnit = unit;
     document.getElementById('unit-lbs').classList.toggle('active', unit === 'lbs');
     document.getElementById('unit-kg').classList.toggle('active', unit === 'kg');
+    document.querySelectorAll('#varsets-rows .varsets-weight')
+      .forEach(inp => inp.placeholder = unit);
   }
 
   function setUnit2(unit) {
