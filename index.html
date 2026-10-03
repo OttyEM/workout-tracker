@@ -1019,6 +1019,16 @@
   </div>
 </div>
 
+<!-- New PR modal -->
+<div id="pr-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:500;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:white;border-radius:14px;padding:24px;width:100%;max-width:320px;box-shadow:0 4px 20px rgba(0,0,0,0.15);text-align:center;">
+    <div style="font-size:2.5rem;line-height:1">🎉</div>
+    <div style="font-weight:700;font-size:1.2rem;margin:8px 0 12px">New PR! Congrats!</div>
+    <div id="pr-modal-list" style="text-align:left;margin-bottom:16px"></div>
+    <button class="btn btn-primary" onclick="document.getElementById('pr-modal').style.display='none'">Nice!</button>
+  </div>
+</div>
+
 <div id="view-calendar">
   <div class="card">
     <div class="cal-nav">
@@ -1844,8 +1854,46 @@ const rows = loadAll();
       rows.push({ id: uid(), ...entry });
     }
 
+    // Remember the current PRs so we can spot a new one after saving
+    const prBefore = [exercise, exercise2].filter(Boolean).map(name => ({
+      base: baseMovementName(name),
+      unit: name === exercise ? unit : unit2,
+    })).filter((m, i, all) => all.findIndex(o => o.base === m.base) === i)
+      .map(m => ({ ...m, prs: bestPRs(m.base) }));
+
     saveAll(rows);
     closeForm();
+
+    const newPRs = [];
+    prBefore.forEach(({ base, unit, prs }) => {
+      const now = bestPRs(base);
+      [1, 3, 5, 10].forEach(rep => {
+        if (prs[rep] && now[rep] > prs[rep] + 0.01) newPRs.push({ base, unit, rep, was: prs[rep], now: now[rep] });
+      });
+    });
+    if (newPRs.length) showPRModal(newPRs);
+  }
+
+  // Best known weight (in lbs) per rep count: higher of calculated and typed-in PR
+  function bestPRs(name) {
+    const auto = calcAutoRMs(name);
+    const manuals = loadRMs()[name] || {};
+    const out = {};
+    [1, 3, 5, 10].forEach(rep => {
+      const v = Math.max(auto[rep] || 0, manuals[rep] || 0);
+      if (v) out[rep] = v;
+    });
+    return out;
+  }
+
+  function showPRModal(prs) {
+    document.getElementById('pr-modal-list').innerHTML = prs.map(p => `
+      <div style="padding:8px 0;border-top:1px solid #e5e5ea">
+        <div style="font-weight:600">${esc(p.base)} · ${p.rep}RM</div>
+        <div style="color:#3a3a3c;font-size:0.95rem">${fmtWeight(fromLbs(p.now, p.unit))} ${p.unit}
+          <span style="color:#8e8e93">(was ${fmtWeight(fromLbs(p.was, p.unit))} ${p.unit})</span></div>
+      </div>`).join('');
+    document.getElementById('pr-modal').style.display = 'flex';
   }
 
   // ── Edit ──────────────────────────────────────────────────────────────────
