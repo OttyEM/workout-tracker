@@ -1159,9 +1159,12 @@
     const fixedRMs = {};
     let rmsChanged = false;
     Object.entries(rms).forEach(([name, reps]) => {
-      const fixed = movementName(name, spellings);
+      const fixed = baseMovementName(movementName(name, spellings));
       if (fixed !== name) rmsChanged = true;
-      fixedRMs[fixed] = { ...(fixedRMs[fixed] || {}), ...reps };
+      fixedRMs[fixed] = fixedRMs[fixed] || {};
+      Object.entries(reps).forEach(([rep, value]) => {
+        fixedRMs[fixed][rep] = Math.max(fixedRMs[fixed][rep] || 0, value);
+      });
     });
     if (rmsChanged) saveRMs(fixedRMs);
   }
@@ -1355,12 +1358,24 @@
     }
   }
 
+  // "Back Squat (Wave)" → "Back Squat". Bracketed text is a variation of the same movement.
+  function baseMovementName(name) {
+    return String(name || '').replace(/\s*\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim() || name;
+  }
+
+  // Which side of an entry is this movement: 'A' (exercise), 'B' (exercise2) or null
+  function movementSide(r, base) {
+    if (baseMovementName(r.exercise) === base) return 'A';
+    if (r.exercise2 && baseMovementName(r.exercise2) === base) return 'B';
+    return null;
+  }
+
   function renderMovements() {
     const rows = loadAll();
     let names = [...new Set([
       ...rows.map(r => r.exercise),
       ...rows.filter(r => r.exercise2).map(r => r.exercise2),
-    ])].filter(Boolean).sort((a, b) => a.localeCompare(b));
+    ].filter(Boolean).map(baseMovementName))].sort((a, b) => a.localeCompare(b));
 
     const el = document.getElementById('view-movements');
     if (!names.length) {
@@ -1373,7 +1388,7 @@
 
     const listHTML = filtered.length
       ? filtered.map(name => {
-          const count = rows.filter(r => r.exercise === name || r.exercise2 === name).length;
+          const count = rows.filter(r => movementSide(r, name)).length;
           return `<div class="movement-item" onclick="navigateToMovement('${esc(name)}')">
             <div>
               <div>${esc(name)}</div>
@@ -1420,12 +1435,12 @@
   }
 
   function calcAutoRMs(name) {
-    const rows = loadAll().filter(r => r.exercise === name || r.exercise2 === name);
+    const rows = loadAll().filter(r => movementSide(r, name));
     const result = {};
     [1, 3, 5, 10].forEach(rep => {
       let best = 0;
       rows.forEach(r => {
-        const isA = r.exercise === name;
+        const isA = movementSide(r, name) === 'A';
         if (r.variablesets && isA) {
           // Each set has its own reps and weight
           const repsArr   = String(r.reps   || '').split(',');
@@ -1470,7 +1485,7 @@
   function rmSectionHTML(name) {
     const auto    = calcAutoRMs(name);
     const manuals = loadRMs()[name] || {};
-    const rows    = loadAll().filter(r => r.exercise === name || r.exercise2 === name)
+    const rows    = loadAll().filter(r => movementSide(r, name))
                              .sort((a, b) => b.date.localeCompare(a.date));
     const unit    = rows.length ? (rows[0].unit || 'lbs') : 'lbs';
 
@@ -1498,7 +1513,7 @@
   function renderMovementDetail() {
     const name = selectedMovement;
     const rows = loadAll()
-      .filter(r => r.exercise === name || r.exercise2 === name)
+      .filter(r => movementSide(r, name))
       .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
 
     const el = document.getElementById('view-movement-detail');
@@ -1513,7 +1528,9 @@
     html += rows.map(r => {
       const unit  = r.unit  || 'lbs';
       const unit2 = r.unit2 || r.unit || 'lbs';
-      const isA   = r.exercise === name;
+      const isA   = movementSide(r, name) === 'A';
+      const full  = isA ? r.exercise : r.exercise2;
+      const variation = (full.match(/\(([^)]*)\)/g) || []).map(v => v.slice(1, -1).trim()).filter(Boolean).join(', ');
       const s     = (r.variablesets && isA)
         ? varSetsLine(r.sets, r.reps, r.weight, unit)
         : (isA
@@ -1525,7 +1542,7 @@
         : null;
 
       return `<div class="movement-session">
-        <div class="movement-session-date">${fmtDate(r.date)}</div>
+        <div class="movement-session-date">${fmtDate(r.date)}${variation ? ` · ${esc(variation)}` : ''}</div>
         ${s ? `<div class="entry-meta">${s}</div>` : ''}
         ${comment ? `<div class="entry-comment">${esc(comment)}</div>` : ''}
         ${partner ? `<div class="entry-meta" style="color:#8e8e93">Superset with ${esc(partner)}</div>` : ''}
