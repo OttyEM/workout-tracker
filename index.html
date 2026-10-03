@@ -786,17 +786,7 @@
     #share-day-content .share-entry { border-top: 1px solid #e5e5ea; padding: 12px 0; }
     #share-day-content h3 { font-size: 1rem; margin: 0 0 6px; }
     #share-day-content p { margin: 3px 0; font-size: 0.9rem; color: #3a3a3c; }
-    #share-day-content .note { color: #8e8e93; font-style: italic; }
-
-    /* When printing, show only the share summary */
-    @media print {
-      body > *:not(#share-day-modal) { display: none !important; }
-      body { background: white !important; }
-      #share-day-modal { position: static !important; background: none !important; padding: 0 !important; display: block !important; }
-      #share-day-modal .share-sheet { box-shadow: none !important; max-height: none !important; overflow: visible !important; max-width: none !important; }
-      #share-day-modal .share-actions { display: none !important; }
-    }
-  </style>
+    #share-day-content .note { color: #8e8e93; font-style: italic; }  </style>
 </head>
 <body>
 
@@ -1023,7 +1013,7 @@
   <div class="share-sheet" style="background:white;border-radius:14px;padding:24px;width:100%;max-width:420px;max-height:90vh;overflow-y:auto;box-shadow:0 4px 20px rgba(0,0,0,0.15);">
     <div id="share-day-content"></div>
     <div class="share-actions" style="margin-top:16px">
-      <button class="btn btn-primary" onclick="window.print()">Share / Save PDF</button>
+      <button class="btn btn-primary" onclick="shareDayImage()">Share image</button>
       <button class="btn btn-outline" onclick="document.getElementById('share-day-modal').style.display='none'">Close</button>
     </div>
   </div>
@@ -2068,9 +2058,125 @@ const rows = loadAll();
       return `<div class="share-entry">${html}</div>`;
     }).join('');
 
+    shareDate = date;
     document.getElementById('share-day-content').innerHTML =
       `<h1>Workout Tracker</h1><p class="sub">${fmtDate(date)}</p>${entries}`;
     document.getElementById('share-day-modal').style.display = 'flex';
+  }
+
+  let shareDate = null;
+
+  // Draws the day's summary onto a picture and opens the iPhone share sheet.
+  function shareDayImage() {
+    const rows = loadAll().filter(r => r.date === shareDate);
+    if (!rows.length) return;
+
+    const W = 360, PAD = 24, SCALE = 3;
+    const F = '-apple-system, BlinkMacSystemFont, sans-serif';
+    const font = {
+      h1:   `700 22px ${F}`,
+      sub:  `400 14px ${F}`,
+      h3:   `700 16px ${F}`,
+      bold: `700 14px ${F}`,
+      p:    `400 14px ${F}`,
+      note: `italic 400 14px ${F}`,
+    };
+    const dark = '#1c1c1e', text = '#3a3a3c', grey = '#8e8e93';
+
+    // Each item is one paragraph: a list of text pieces (font + colour) and a line height
+    const items = [
+      { runs: [{ t: 'Workout Tracker', f: font.h1, c: dark }], lh: 28 },
+      { runs: [{ t: fmtDate(shareDate), f: font.sub, c: '#6c6c70' }], lh: 20 },
+    ];
+    const para = (t, f, c, lh = 20) => t && items.push({ runs: [{ t, f, c }], lh });
+    const labelled = (label, stats) =>
+      items.push({ runs: [{ t: label + ':', f: font.bold, c: dark }, { t: stats || '—', f: font.p, c: text }], lh: 20 });
+
+    rows.forEach(r => {
+      items.push({ divider: true });
+      const unit  = r.unit  || 'lbs';
+      const unit2 = r.unit2 || r.unit || 'lbs';
+      if (r.superset && r.exercise2) {
+        para(`${r.exercise} + ${r.exercise2}`, font.h3, dark, 22);
+        labelled(r.exercise, statsLine(r.sets, r.reps, r.weight, r.tempo, unit));
+        para(r.comment, font.note, grey);
+        labelled(r.exercise2, statsLine(r.sets2, r.reps2, r.weight2, r.tempo2, unit2));
+        para(r.comment2, font.note, grey);
+      } else {
+        para(r.exercise, font.h3, dark, 22);
+        para(statsLine(r.sets, r.reps, r.weight, r.tempo, unit), font.p, text);
+        para(r.comment, font.note, grey);
+      }
+    });
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    // Split a paragraph into lines that fit the width, word by word
+    const wrap = runs => {
+      const lines = [[]];
+      let x = 0;
+      runs.forEach(run => run.t.split(' ').forEach(word => {
+        if (!word) return;
+        ctx.font = run.f;
+        const space = x > 0 ? ctx.measureText(' ').width : 0;
+        const w = ctx.measureText(word).width;
+        if (x > 0 && x + space + w > W - PAD * 2) { lines.push([]); x = 0; }
+        else x += space;
+        lines[lines.length - 1].push({ t: word, f: run.f, c: run.c, x });
+        x += w;
+      }));
+      return lines;
+    };
+
+    // First pass: work out how tall the picture needs to be
+    const laid = items.map(it => it.divider ? it : { ...it, lines: wrap(it.runs) });
+    let H = PAD;
+    laid.forEach(it => { H += it.divider ? 24 : it.lines.length * it.lh; });
+    H += PAD;
+
+    // Second pass: draw
+    canvas.width  = W * SCALE;
+    canvas.height = H * SCALE;
+    ctx.scale(SCALE, SCALE);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, W, H);
+    ctx.textBaseline = 'top';
+    let y = PAD;
+    laid.forEach(it => {
+      if (it.divider) {
+        ctx.fillStyle = '#e5e5ea';
+        ctx.fillRect(PAD, y + 12, W - PAD * 2, 1);
+        y += 24;
+        return;
+      }
+      it.lines.forEach(line => {
+        line.forEach(w => {
+          ctx.font = w.f;
+          ctx.fillStyle = w.c;
+          ctx.fillText(w.t, PAD + w.x, y + (it.lh - 18) / 2);
+        });
+        y += it.lh;
+      });
+    });
+
+    // Turn the picture into a file right away (iPhone needs share to happen straight after the tap)
+    const bin = atob(canvas.toDataURL('image/png').split(',')[1]);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const file = new File([bytes], `workout-${shareDate}.png`, { type: 'image/png' });
+
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file] }).catch(() => {});
+    } else {
+      // Computers without a share sheet: just download the picture
+      const a = Object.assign(document.createElement('a'), {
+        href: URL.createObjectURL(file),
+        download: file.name,
+      });
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
   }
 
   function exportData() {
