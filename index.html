@@ -779,6 +779,23 @@
       color: #3a3a3c;
       margin: 16px 0 8px;
     }
+
+    /* Share Day summary */
+    #share-day-content h1 { font-size: 1.3rem; margin: 0 0 4px; }
+    #share-day-content .sub { font-size: 0.9rem; color: #6c6c70; margin: 0 0 12px; }
+    #share-day-content .share-entry { border-top: 1px solid #e5e5ea; padding: 12px 0; }
+    #share-day-content h3 { font-size: 1rem; margin: 0 0 6px; }
+    #share-day-content p { margin: 3px 0; font-size: 0.9rem; color: #3a3a3c; }
+    #share-day-content .note { color: #8e8e93; font-style: italic; }
+
+    /* When printing, show only the share summary */
+    @media print {
+      body > *:not(#share-day-modal) { display: none !important; }
+      body { background: white !important; }
+      #share-day-modal { position: static !important; background: none !important; padding: 0 !important; display: block !important; }
+      #share-day-modal .share-sheet { box-shadow: none !important; max-height: none !important; overflow: visible !important; max-width: none !important; }
+      #share-day-modal .share-actions { display: none !important; }
+    }
   </style>
 </head>
 <body>
@@ -998,6 +1015,17 @@
     <input type="date" id="move-day-picker" style="width:100%;padding:10px 12px;border:1.5px solid #e5e5ea;border-radius:10px;font-size:1rem;color:#1c1c1e;background:white;margin-bottom:16px;">
     <button class="btn btn-primary" onclick="confirmMoveDay()">Move</button>
     <button class="btn btn-outline" onclick="document.getElementById('move-day-modal').style.display='none'">Cancel</button>
+  </div>
+</div>
+
+<!-- Share Day modal -->
+<div id="share-day-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:500;align-items:center;justify-content:center;padding:20px;">
+  <div class="share-sheet" style="background:white;border-radius:14px;padding:24px;width:100%;max-width:420px;max-height:90vh;overflow-y:auto;box-shadow:0 4px 20px rgba(0,0,0,0.15);">
+    <div id="share-day-content"></div>
+    <div class="share-actions" style="margin-top:16px">
+      <button class="btn btn-primary" onclick="window.print()">Share / Save PDF</button>
+      <button class="btn btn-outline" onclick="document.getElementById('share-day-modal').style.display='none'">Close</button>
+    </div>
   </div>
 </div>
 
@@ -2037,34 +2065,12 @@ const rows = loadAll();
         if (s)         html += `<p>${s}</p>`;
         if (r.comment) html += `<p class="note">${esc(r.comment)}</p>`;
       }
-      return `<div class="entry">${html}</div>`;
+      return `<div class="share-entry">${html}</div>`;
     }).join('');
 
-    const page = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Workout — ${fmtDate(date)}</title>
-  <style>
-    body { font-family: -apple-system, sans-serif; max-width: 600px; margin: 40px auto; padding: 0 24px; color: #1c1c1e; }
-    h1   { font-size: 1.4rem; margin: 0 0 4px; }
-    .sub { font-size: 0.9rem; color: #6c6c70; margin-bottom: 24px; }
-    .entry { border-top: 1px solid #e5e5ea; padding: 14px 0; }
-    h3   { font-size: 1rem; margin: 0 0 6px; }
-    p    { margin: 3px 0; font-size: 0.9rem; color: #3a3a3c; }
-    .note { color: #8e8e93; font-style: italic; }
-  </style>
-</head>
-<body>
-  <h1>Workout Tracker</h1>
-  <p class="sub">${fmtDate(date)}</p>
-  ${entries}
-  <script>window.onafterprint = () => window.close(); window.print();<\/script>
-</body>
-</html>`;
-
-    const w = window.open('', '_blank');
-    if (w) { w.document.write(page); w.document.close(); }
+    document.getElementById('share-day-content').innerHTML =
+      `<h1>Workout Tracker</h1><p class="sub">${fmtDate(date)}</p>${entries}`;
+    document.getElementById('share-day-modal').style.display = 'flex';
   }
 
   function exportData() {
