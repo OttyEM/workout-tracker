@@ -1575,7 +1575,10 @@
         : null;
 
       return `<div class="movement-session">
-        <div class="movement-session-date">${fmtDate(r.date)}${variation ? ` · ${esc(variation)}` : ''}</div>
+        <div class="entry-top">
+          <div class="movement-session-date">${fmtDate(r.date)}${variation ? ` · ${esc(variation)}` : ''}</div>
+          <button class="btn btn-secondary btn-sm" onclick="startEdit('${r.id}')">Edit</button>
+        </div>
         ${s ? `<div class="entry-meta">${s}</div>` : ''}
         ${comment ? `<div class="entry-comment">${esc(comment)}</div>` : ''}
         ${partner ? `<div class="entry-meta" style="color:#8e8e93">Superset with ${esc(partner)}</div>` : ''}
@@ -1627,7 +1630,9 @@
   function openForm() {
     updateSuggestions();
     document.getElementById('view-form').style.display     = '';
-    document.getElementById('view-calendar').style.display = 'none';
+    ['view-calendar', 'view-movements', 'view-movement-detail', 'view-clock']
+      .forEach(id => document.getElementById(id).style.display = 'none');
+    document.querySelector('.fab').style.display = 'none';
     document.getElementById('cancel-btn').style.display    = '';
     window.scrollTo({ top: 0, behavior: 'instant' });
   }
